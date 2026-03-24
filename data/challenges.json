@@ -1,0 +1,226 @@
+[
+  {
+    "id": 1,
+    "difficulty": "easy",
+    "question": "List all files in current directory",
+    "answers": ["ls"],
+    "hint": "The command is a short 2-letter abbreviation for 'list'."
+  },
+  {
+    "id": 2,
+    "difficulty": "easy",
+    "question": "List all files including hidden ones",
+    "answers": ["ls -a", "ls -la"],
+    "hint": "You need the 'all' flag, which is usually represented by the letter 'a'."
+  },
+  {
+    "id": 3,
+    "difficulty": "easy",
+    "question": "Change directory to documents",
+    "answers": ["cd documents"],
+    "hint": "Use the 'change directory' command followed by the folder name."
+  },
+  {
+    "id": 4,
+    "difficulty": "easy",
+    "question": "Go back one directory",
+    "answers": ["cd .."],
+    "hint": "In Linux, '..' represents the parent directory."
+  },
+  {
+    "id": 5,
+    "difficulty": "easy",
+    "question": "Show current directory path",
+    "answers": ["pwd"],
+    "hint": "Stands for 'Print Working Directory'."
+  },
+  {
+    "id": 6,
+    "difficulty": "easy",
+    "question": "Create a folder named projects",
+    "answers": ["mkdir projects"],
+    "hint": "Use the command to 'make directory'."
+  },
+  {
+    "id": 7,
+    "difficulty": "easy",
+    "question": "Create an empty file named notes.txt",
+    "answers": ["touch notes.txt"],
+    "hint": "This command 'touches' a file to create it if it doesn't exist."
+  },
+  {
+    "id": 8,
+    "difficulty": "easy",
+    "question": "Remove file temp.txt",
+    "answers": ["rm temp.txt"],
+    "hint": "Short for 'remove'."
+  },
+  {
+    "id": 9,
+    "difficulty": "easy",
+    "question": "Copy file1.txt to backup.txt",
+    "answers": ["cp file1.txt backup.txt"],
+    "hint": "Use 'cp [source] [destination]'."
+  },
+  {
+    "id": 10,
+    "difficulty": "easy",
+    "question": "Move file1.txt to documents/",
+    "answers": ["mv file1.txt documents/"],
+    "hint": "The 'move' command is just two letters."
+  },
+  {
+    "id": 11,
+    "difficulty": "medium",
+    "question": "Show contents of file.txt",
+    "answers": ["cat file.txt"],
+    "hint": "Think of 'concatenate'. Not the animal, but sounds like it!"
+  },
+  {
+    "id": 12,
+    "difficulty": "medium",
+    "question": "Show first 10 lines of file.txt",
+    "answers": ["head file.txt", "head -n 10 file.txt"],
+    "hint": "What is at the top of a body?"
+  },
+  {
+    "id": 13,
+    "difficulty": "medium",
+    "question": "Show last 10 lines of file.txt",
+    "answers": ["tail file.txt", "tail -n 10 file.txt"],
+    "hint": "What is at the very end of an animal?"
+  },
+  {
+    "id": 14,
+    "difficulty": "medium",
+    "question": "Search for 'error' in file.txt",
+    "answers": ["grep error file.txt", "grep 'error' file.txt"],
+    "hint": "Use 'grep' to search for patterns in text."
+  },
+  {
+    "id": 15,
+    "difficulty": "medium",
+    "question": "Count lines in file.txt",
+    "answers": ["wc -l file.txt"],
+    "hint": "Use the 'word count' command with the 'lines' flag."
+  },
+  {
+    "id": 16,
+    "difficulty": "medium",
+    "question": "Find all .txt files",
+    "answers": ["find . -name \"*.txt\"", "find . -name '*.txt'"],
+    "hint": "Use the 'find' command with the '-name' flag and a wildcard (*)."
+  },
+  {
+    "id": 17,
+    "difficulty": "medium",
+    "question": "List files in long format",
+    "answers": ["ls -l"],
+    "hint": "Add the '-l' flag to the list command."
+  },
+  {
+    "id": 18,
+    "difficulty": "medium",
+    "question": "Make script.sh executable",
+    "answers": ["chmod +x script.sh"],
+    "hint": "You need to 'change mode' and add (+) the 'execute' (x) permission."
+  },
+  {
+    "id": 19,
+    "difficulty": "medium",
+    "question": "Rename old.txt to new.txt",
+    "answers": ["mv old.txt new.txt"],
+    "hint": "In Linux, renaming is just moving a file to a new name."
+  },
+  {
+    "id": 20,
+    "difficulty": "medium",
+    "question": "Open file.txt with paging",
+    "answers": ["less file.txt"],
+    "hint": "This command is the opposite of 'more'."
+  },
+  {
+    "id": 21,
+    "difficulty": "hard",
+    "question": "Count how many .txt files exist",
+    "answers": ["ls *.txt | wc -l"],
+    "hint": "List the files, then pipe (|) the output to the word count command."
+  },
+  {
+    "id": 22,
+    "difficulty": "hard",
+    "question": "Count lines containing 'error' in file.txt",
+    "answers": ["grep error file.txt | wc -l"],
+    "hint": "Grep the word, then pipe the result to 'wc -l'."
+  },
+  {
+    "id": 23,
+    "difficulty": "hard",
+    "question": "Find all .log files containing 'fail'",
+    "answers": ["grep -l fail *.log"],
+    "hint": "Use grep with the '-l' flag to list filenames only."
+  },
+  {
+    "id": 24,
+    "difficulty": "hard",
+    "question": "Sort contents of file.txt",
+    "answers": ["sort file.txt"],
+    "hint": "The command is exactly what you want to do to the lines."
+  },
+  {
+    "id": 25,
+    "difficulty": "hard",
+    "question": "Remove duplicate lines from file.txt",
+    "answers": ["sort file.txt | uniq"],
+    "hint": "You must sort the file first, then pipe to the 'unique' command."
+  },
+  {
+    "id": 26,
+    "difficulty": "hard",
+    "question": "Find files larger than 1MB",
+    "answers": ["find . -size +1M"],
+    "hint": "Use find with the '-size' flag and '+1M'."
+  },
+  {
+    "id": 27,
+    "difficulty": "hard",
+    "question": "Show all running processes",
+    "answers": ["ps aux"],
+    "hint": "Think 'process status' with flags 'aux'."
+  },
+  {
+    "id": 28,
+    "difficulty": "hard",
+    "question": "Kill process with PID 1234",
+    "answers": ["kill 1234"],
+    "hint": "The command is quite violent! Just the word followed by the number."
+  },
+  {
+    "id": 29,
+    "difficulty": "hard",
+    "question": "Download a file named as 'file.txt' from a website named 'https://example.com'",
+    "answers": ["curl -O https://example.com/file.txt"],
+    "hint": "Use 'curl' with the capital '-O' flag to save it."
+  },
+  {
+    "id": 30,
+    "difficulty": "hard",
+    "question": "Compress logs folder into logs.tar.gz",
+    "answers": ["tar -czvf logs.tar.gz logs/"],
+    "hint": "The flags stand for: Create, Zip (gzip), Verbose, File."
+  },
+  {
+    "id": 31,
+    "difficulty": "expert",
+    "question": "Count unique IP addresses in access.log",
+    "answers": ["awk '{print $1}' access.log | sort | uniq | wc -l"],
+    "hint": "Use 'awk' to print the first column, then sort, then uniq, then count."
+  },
+  {
+    "id": 32,
+    "difficulty": "expert",
+    "question": "Find top 5 most common words in file.txt",
+    "answers": ["tr ' ' '\\n' < file.txt | sort | uniq -c | sort -nr | head -5"],
+    "hint": "Translate spaces to newlines, sort, count unique, sort numerically reversed, then take the top 5."
+  }
+]
