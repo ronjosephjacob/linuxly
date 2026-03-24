@@ -1,6 +1,6 @@
 // app/actions.ts
 'use server'
-import { kv } from "@vercel/kv";
+import { Redis } from '@upstash/redis'
 import challengesData from "../data/challenges.json";
 
 interface Challenge {
@@ -8,6 +8,7 @@ interface Challenge {
   answers: string[];
 }
 
+const kv = Redis.fromEnv()
 export async function verifyAndSubmit(challengeId: number, userInput: string, userName: string, currentXp: number) {
   // 1. Find the challenge
   const challenge = (challengesData as Challenge[]).find(c => c.id === challengeId);
