@@ -19,50 +19,52 @@ export interface LinuxQuestion {
   difficulty: 'easy' | 'medium' | 'hard' | 'expert';
 }
 
-// 1. GET THE GLOBAL DAILY QUESTION
+// Helper function to lock time to GMT+8 Manila
+function getManilaDateString() {
+  const now = new Date();
+  const phTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+  return phTime.toISOString().split('T')[0]; 
+}
+
+// 1. GET THE GLOBAL DAILY QUESTION (100% Refresh Safe)
 export async function getDailyChallengeAction() {
-  const today = new Date().toISOString().split('T')[0]; 
-  const cacheKey = `daily_question_id:${today}`;
-
-  let dailyIndex = await kv.get<number>(cacheKey);
-
-  if (dailyIndex === null || dailyIndex === undefined) {
-    dailyIndex = Math.floor(Math.random() * challengesData.length);
-    await kv.set(cacheKey, dailyIndex, { ex: 86400 });
+  const todayStr = getManilaDateString();
+  
+  // Mathematical Hash: This guarantees the index is always exactly the same for a specific date,
+  // bypassing any database connection delays or caching issues.
+  let hash = 0;
+  for (let i = 0; i < todayStr.length; i++) {
+    hash = Math.imul(31, hash) + todayStr.charCodeAt(i) | 0;
   }
-
+  
+  const dailyIndex = Math.abs(hash) % challengesData.length;
   return challengesData[dailyIndex] as LinuxQuestion;
 }
 
 // 2. CHECK IF USER ALREADY SOLVED TODAY
 export async function checkSolveStatus(userName: string) {
-  const today = new Date().toISOString().split('T')[0];
-  const solveKey = `solved:${today}:${userName}`;
+  const todayStr = getManilaDateString();
+  const solveKey = `solved:${todayStr}:${userName}`;
   const alreadySolved = await kv.get(solveKey);
   return !!alreadySolved; 
 }
 
 // 3. VERIFY ANSWER AND SAVE SCORE
 export async function verifyAndSubmit(challengeId: number, userInput: string, userName: string, currentXp: number) {
-  const today = new Date().toISOString().split('T')[0];
-  const solveKey = `solved:${today}:${userName}`;
+  const todayStr = getManilaDateString();
+  const solveKey = `solved:${todayStr}:${userName}`;
 
   // Anti-cheat: Check solve status first
   const alreadySolved = await kv.get(solveKey);
   if (alreadySolved) {
-    return { success: false, message: "⚠️ Already submitted today." };
+    return { success: false, message: "⚠️ Score ignored: You have already submitted an answer today." };
   }
 
-  // Replace: const challenge = (challengesData as any[]).find(c => c.id === challengeId);
-// With:
-const challenge = (challengesData as RawChallenge[]).find(c => c.id === challengeId);
+  const challenge = (challengesData as RawChallenge[]).find(c => c.id === challengeId);
+  if (!challenge) return { success: false, message: "Challenge not found" };
 
-if (!challenge) return { success: false, message: "Challenge not found" };
-
-const clean = (str: string) => str.trim().toLowerCase().replace(/\/+$/, "").replace(/\s+/g, " ");
-
-// TypeScript now knows 'ans' is a string because of RawChallenge[]
-const isCorrect = challenge.answers.some((ans) => clean(ans) === clean(userInput));
+  const clean = (str: string) => str.trim().toLowerCase().replace(/\/+$/, "").replace(/\s+/g, " ");
+  const isCorrect = challenge.answers.some((ans) => clean(ans) === clean(userInput));
 
   if (isCorrect) {
     await kv.set(solveKey, true, { ex: 86400 });

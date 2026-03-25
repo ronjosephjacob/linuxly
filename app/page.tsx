@@ -36,7 +36,7 @@ const AVATAR_STYLES = [
 export default function Home() {
   const [mounted, setMounted] = useState(false);
 
-  // --- 1. LAZY STATE INITIALIZATION (Hydration Safe & Zero Cascades) ---
+  // --- 1. LAZY STATE INITIALIZATION ---
   const [xp, setXp] = useState<number>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("linuxly_xp");
@@ -110,7 +110,6 @@ export default function Home() {
       if (dailyQuestion) {
         setChallenge(dailyQuestion as Challenge);
         
-        // Server-side check if this user already finished today
         const hasSolvedToday = await checkSolveStatus(currentName);
         
         if (hasSolvedToday) {
@@ -144,7 +143,6 @@ export default function Home() {
 
   // --- 3. EFFECTS ---
   
-  // Clean initialization effect (No cascading setStates here)
   useEffect(() => {
     setMounted(true);
     refreshChallenge(userName);
@@ -152,7 +150,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Timer Effect
   useEffect(() => {
     if (!mounted) return;
     const timer = setInterval(() => {
@@ -171,7 +168,6 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [mounted]);
 
-  // Terminal Auto-scroll
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history]);
@@ -181,7 +177,6 @@ export default function Home() {
     const formatted = name.trim().slice(0, 12) || "User";
     setUserName(formatted);
     localStorage.setItem("linuxly_name", formatted);
-    // Refresh challenge state for the new user name
     refreshChallenge(formatted);
   };
 
@@ -253,7 +248,6 @@ export default function Home() {
     }
   };
 
-  // HYDRATION GATE - Crucial for avoiding mismatch errors with Lazy State
   if (!mounted) return null; 
 
   const currentRank = getRankInfo(xp);
@@ -361,15 +355,9 @@ export default function Home() {
                 {showHint ? "[-] Hide Hint" : "[+] Reveal Hint"}
               </button>
             ) : <span className="text-[10px] font-mono text-emerald-500 font-bold uppercase tracking-widest animate-pulse">{isTester ? "DEBUG OVERRIDE" : "LOCKED"}</span>}
+            
+            {/* SKIP BUTTON HAS BEEN REMOVED ENTIRELY */}
             <div className="flex gap-4 items-center">
-              {isTester && (
-                <button 
-                  onClick={() => refreshChallenge(userName)} 
-                  className="text-[10px] font-mono uppercase transition-colors text-orange-400 font-bold hover:text-orange-300"
-                >
-                  Debug: Force Skip →
-                </button>
-              )}
             </div>
           </div>
         </div>
