@@ -17,11 +17,11 @@ export interface LinuxQuestion {
   question: string;
   hint: string;
   difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  answers: string[]; 
 }
 
 /**
- * FIXED: Returns YYYY-MM-DD locked specifically to Manila Time (GMT+8)
- * This prevents the question from changing if the server is in a different timezone.
+ * Returns YYYY-MM-DD locked to Manila Time (GMT+8)
  */
 function getManilaDateString() {
   return new Intl.DateTimeFormat('en-CA', { 
@@ -32,21 +32,16 @@ function getManilaDateString() {
   }).format(new Date()); 
 }
 
-// 1. GET THE GLOBAL DAILY QUESTION (Determined by Math, not Randomness)
 export async function getDailyChallengeAction() {
   const todayStr = getManilaDateString();
-  
-  // Mathematical Hash: Ensures the index is 100% stable for the entire 24h period.
   let hash = 0;
   for (let i = 0; i < todayStr.length; i++) {
     hash = Math.imul(31, hash) + todayStr.charCodeAt(i) | 0;
   }
-  
   const dailyIndex = Math.abs(hash) % challengesData.length;
   return challengesData[dailyIndex] as LinuxQuestion;
 }
 
-// 2. CHECK IF USER ALREADY SOLVED TODAY
 export async function checkSolveStatus(userName: string) {
   const todayStr = getManilaDateString();
   const solveKey = `solved:${todayStr}:${userName}`;
@@ -54,40 +49,53 @@ export async function checkSolveStatus(userName: string) {
   return !!alreadySolved; 
 }
 
-// 3. VERIFY ANSWER AND SAVE SCORE
-export async function verifyAndSubmit(challengeId: number, userInput: string, userName: string, currentXp: number) {
+export async function verifyAndSubmit(
+  challengeId: number, 
+  userInput: string, 
+  userName: string, 
+  currentXp: number,
+  avatarConfig: { style: string; seed: string } 
+) {
   const todayStr = getManilaDateString();
   const solveKey = `solved:${todayStr}:${userName}`;
 
   const alreadySolved = await kv.get(solveKey);
   if (alreadySolved) {
-    return { success: false, message: "⚠️ You have already solved today's challenge." };
+    return { success: false, message: "⚠️ Access Denied: Already submitted today." };
   }
 
   const challenge = (challengesData as RawChallenge[]).find(c => c.id === challengeId);
-  if (!challenge) return { success: false, message: "Challenge error." };
+  if (!challenge) return { success: false, message: "Critical: Challenge data missing." };
 
   const clean = (str: string) => str.trim().toLowerCase().replace(/\/+$/, "").replace(/\s+/g, " ");
   const isCorrect = challenge.answers.some((ans) => clean(ans) === clean(userInput));
 
   if (isCorrect) {
-    // Mark as solved in Redis for 24 hours
     await kv.set(solveKey, true, { ex: 86400 });
-    // Update Global Leaderboard
-    await kv.zadd("leaderboard_alpha", { score: currentXp, member: userName });
-    return { success: true, message: "Correct! Progress saved to cloud." };
+    
+    // Store user as "Name|Style|Seed" so the leaderboard can render their specific avatar
+    const memberKey = `${userName}|${avatarConfig.style}|${avatarConfig.seed}`;
+    await kv.zadd("leaderboard_alpha", { score: currentXp, member: memberKey });
+    
+    return { success: true, message: "Success: Hash verified. XP synchronized." };
   }
 
-  return { success: false, message: "Incorrect command." };
+  return { success: false, message: "Error: Invalid command sequence." };
 }
 
-// 4. LEADERBOARD UTILITIES
 export async function getLeaderboard() {
   try {
     const topUsers = await kv.zrange("leaderboard_alpha", 0, 9, { rev: true, withScores: true });
     const formatted = [];
     for (let i = 0; i < topUsers.length; i += 2) {
-      formatted.push({ name: topUsers[i] as string, xp: topUsers[i + 1] as number });
+      const rawMember = topUsers[i] as string;
+      const [name, style, seed] = rawMember.split('|');
+      formatted.push({ 
+        name: name || "Unknown", 
+        style: style || 'pixel-art', 
+        seed: seed || 'Tux', 
+        xp: topUsers[i + 1] as number 
+      });
     }
     return formatted;
   } catch { return []; }
