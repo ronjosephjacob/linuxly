@@ -1,8 +1,13 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import challengesData from "../data/challenges.json";
 // Import the secure server functions
-import { verifyAndSubmit, getLeaderboard, getPlayerCount } from "./actions";
+import { 
+  verifyAndSubmit, 
+  getLeaderboard, 
+  getPlayerCount, 
+  getDailyChallengeAction, 
+  checkSolveStatus 
+} from "./actions";
 
 // --- TYPES ---
 interface Challenge {
@@ -31,7 +36,7 @@ const AVATAR_STYLES = [
 export default function Home() {
   const [mounted, setMounted] = useState(false);
 
-  // --- 1. LAZY STATE INITIALIZATION (Hydration Safe) ---
+  // --- 1. LAZY STATE INITIALIZATION (Hydration Safe & Zero Cascades) ---
   const [xp, setXp] = useState<number>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("linuxly_xp");
@@ -63,7 +68,9 @@ export default function Home() {
         const today = new Date().toDateString();
         const last = new Date(lastDate).toDateString();
         const yesterday = new Date(Date.now() - 86400000).toDateString();
-        if (today === last || last === yesterday) return parseInt(savedStreak);
+        if (today === last || last === yesterday) {
+          return parseInt(savedStreak);
+        }
       }
     }
     return 0;
@@ -97,17 +104,35 @@ export default function Home() {
     if (count !== undefined) setTotalPlayers(count);
   };
 
-  const refreshChallenge = useCallback(() => {
-    if (!challengesData || challengesData.length === 0) return;
-    const data = challengesData as Challenge[];
-    const randomIndex = Math.floor(Math.random() * data.length);
-    setChallenge(data[randomIndex]);
-    setHistory([{ text: "Challenge loaded. System ready.", type: 'resp' }]);
-    setInput("");
-    setShowHint(false);
-    setIsSolved(false);
-    setAttempts(0);
-    setHintUsed(false);
+  const refreshChallenge = useCallback(async (currentName: string) => {
+    try {
+      const dailyQuestion = await getDailyChallengeAction();
+      if (dailyQuestion) {
+        setChallenge(dailyQuestion as Challenge);
+        
+        // Server-side check if this user already finished today
+        const hasSolvedToday = await checkSolveStatus(currentName);
+        
+        if (hasSolvedToday) {
+          setIsSolved(true);
+          setHistory([
+            { text: "Restoring session from cloud...", type: 'resp' },
+            { text: `Welcome back, ${currentName}. Today's challenge is complete.`, type: 'resp' }
+          ]);
+        } else {
+          setHistory([
+            { text: "Synchronizing with Global Daily Challenge...", type: 'resp' },
+            { text: "System ready.", type: 'resp' }
+          ]);
+        }
+      }
+      setInput("");
+      setShowHint(false);
+      setAttempts(0);
+      setHintUsed(false);
+    } catch (error) {
+      setHistory([{ text: "Error syncing with server. Reconnecting...", type: 'resp' }]);
+    }
   }, []);
 
   const getRankInfo = (val: number) => {
@@ -118,15 +143,16 @@ export default function Home() {
   };
 
   // --- 3. EFFECTS ---
+  
+  // Clean initialization effect (No cascading setStates here)
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      setMounted(true);
-      refreshChallenge();
-      fetchRankings();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [refreshChallenge]);
+    setMounted(true);
+    refreshChallenge(userName);
+    fetchRankings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Timer Effect
   useEffect(() => {
     if (!mounted) return;
     const timer = setInterval(() => {
@@ -145,6 +171,7 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [mounted]);
 
+  // Terminal Auto-scroll
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history]);
@@ -154,6 +181,8 @@ export default function Home() {
     const formatted = name.trim().slice(0, 12) || "User";
     setUserName(formatted);
     localStorage.setItem("linuxly_name", formatted);
+    // Refresh challenge state for the new user name
+    refreshChallenge(formatted);
   };
 
   const updateAvatar = (seed: string, style: string) => {
@@ -181,11 +210,9 @@ export default function Home() {
       const currentInput = input;
       setInput(""); 
 
-      // 1. CALL SECURE SERVER ACTION
       const result = await verifyAndSubmit(challenge.id, currentInput, userName, xp);
 
       if (result.success) {
-        // 2. CALCULATE FINAL XP (Matching UI Multiplier)
         let multiplier = 1.0;
         if (streak >= 10) multiplier = 1.5;
         else if (streak >= 7) multiplier = 1.3;
@@ -196,7 +223,6 @@ export default function Home() {
         const finalGain = Math.round(baseGain * multiplier);
         const newTotalXp = xp + finalGain;
 
-        // 3. UPDATE LOCAL STATES
         setXp(newTotalXp);
         localStorage.setItem("linuxly_xp", newTotalXp.toString());
         
@@ -208,14 +234,11 @@ export default function Home() {
         });
 
         setIsSolved(true);
-        
         setHistory(prev => [
           ...prev, 
           { text: `$ ${currentInput}`, type: 'cmd' }, 
           { text: `✅ ${result.message || "Correct!"} (+${finalGain} XP)`, type: 'resp' }
         ]);
-        
-        // 4. SYNC LEADERBOARD
         await fetchRankings();
       } else {
         const newAttempts = attempts + 1;
@@ -223,14 +246,16 @@ export default function Home() {
         setHistory(prev => [
           ...prev, 
           { text: `$ ${currentInput}`, type: 'cmd' }, 
-          { text: newAttempts >= MAX_ATTEMPTS ? "❌ Access Denied. Lockout engaged." : `❌ Incorrect. Attempts: ${newAttempts}/${MAX_ATTEMPTS}`, type: 'resp' }
+          { text: result.message || (newAttempts >= MAX_ATTEMPTS ? "❌ Access Denied. Lockout engaged." : `❌ Incorrect. Attempts: ${newAttempts}/${MAX_ATTEMPTS}`), type: 'resp' }
         ]);
       }
       setIsChecking(false);
     }
   };
 
-  if (!mounted) return null;
+  // HYDRATION GATE - Crucial for avoiding mismatch errors with Lazy State
+  if (!mounted) return null; 
+
   const currentRank = getRankInfo(xp);
   const isTester = userName === "Tester";
   const isGameOver = !isTester && (isSolved || attempts >= MAX_ATTEMPTS);
@@ -297,14 +322,14 @@ export default function Home() {
             </span>
           </div>
           <div className="p-2 flex flex-col gap-1 max-h-[300px] overflow-y-auto">
-            {globalLeaderboard.length > 0 ? globalLeaderboard.map((user, i) => (
-              <div key={user.name} className={`flex items-center gap-3 p-2 rounded-lg ${user.name === userName ? 'bg-emerald-500/10 border border-emerald-500/20' : ''}`}>
+            {globalLeaderboard.length > 0 ? globalLeaderboard.map((userItem, i) => (
+              <div key={userItem.name} className={`flex items-center gap-3 p-2 rounded-lg ${userItem.name === userName ? 'bg-emerald-500/10 border border-emerald-500/20' : ''}`}>
                 <span className="text-[10px] font-mono text-slate-500 w-4">{i + 1}</span>
                 <div className="flex-1">
-                  <div className={`text-xs font-bold ${user.name === userName ? 'text-emerald-400' : 'text-slate-300'}`}>{user.name}</div>
-                  <div className="text-[8px] text-slate-500 uppercase">{getRankInfo(user.xp).title}</div>
+                  <div className={`text-xs font-bold ${userItem.name === userName ? 'text-emerald-400' : 'text-slate-300'}`}>{userItem.name}</div>
+                  <div className="text-[8px] text-slate-500 uppercase">{getRankInfo(userItem.xp).title}</div>
                 </div>
-                <div className="text-[10px] font-mono text-slate-400">{user.xp}</div>
+                <div className="text-[10px] font-mono text-slate-400">{userItem.xp}</div>
               </div>
             )) : <div className="p-4 text-center text-[10px] text-slate-600 font-mono italic">No data synced...</div>}
           </div>
@@ -337,9 +362,12 @@ export default function Home() {
               </button>
             ) : <span className="text-[10px] font-mono text-emerald-500 font-bold uppercase tracking-widest animate-pulse">{isTester ? "DEBUG OVERRIDE" : "LOCKED"}</span>}
             <div className="flex gap-4 items-center">
-              {(isTester || !isGameOver) && (
-                <button onClick={refreshChallenge} className={`text-[10px] font-mono uppercase transition-colors ${isTester ? 'text-orange-400 font-bold hover:text-orange-300' : 'text-slate-600 hover:text-white'}`}>
-                  {isTester ? "Debug: Force Skip →" : "Skip →"}
+              {isTester && (
+                <button 
+                  onClick={() => refreshChallenge(userName)} 
+                  className="text-[10px] font-mono uppercase transition-colors text-orange-400 font-bold hover:text-orange-300"
+                >
+                  Debug: Force Skip →
                 </button>
               )}
             </div>
@@ -356,11 +384,11 @@ export default function Home() {
               <span className="text-emerald-500 font-bold shrink-0">{userName.toLowerCase()}@linuxly:{currentRank.prefix}</span>
               <input 
                 disabled={isGameOver || isChecking}
-                value={isGameOver ? "Session Terminated. New challenge in " + timeLeft : input} 
+                value={isGameOver ? "" : input} 
                 onChange={(e) => setInput(e.target.value)} 
                 onKeyDown={handleCommand} 
                 className={`bg-transparent border-none outline-none flex-1 ${(isGameOver || isChecking) ? 'text-slate-600 italic cursor-not-allowed' : 'text-slate-100'}`} 
-                placeholder={isChecking ? "Authenticating command..." : "..."} 
+                placeholder={isGameOver ? `Locked. Reset in ${timeLeft}` : (isChecking ? "Authenticating..." : "...")} 
                 autoFocus 
               />
             </div>
