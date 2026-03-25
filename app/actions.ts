@@ -3,12 +3,39 @@
 import { Redis } from '@upstash/redis'
 import challengesData from "../data/challenges.json";
 
+export interface LinuxQuestion {
+  id: string | number;
+  command: string;
+  description: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  // Add any other fields you use, like category or hints
+}
+
 interface Challenge {
   id: number;
   answers: string[];
 }
 
 const kv = Redis.fromEnv()
+
+export async function getDailyQuestion(allQuestions: LinuxQuestion[]) {
+  const today = new Date().toISOString().split('T')[0]; 
+  const cacheKey = `daily_question:${today}`;
+
+  // 1. Check if a question is already picked for today
+  let dailyId = await kv.get<number>(cacheKey);
+
+  if (dailyId === null || dailyId === undefined) {
+    // 2. Pick a random index
+    dailyId = Math.floor(Math.random() * allQuestions.length);
+    
+    // 3. Store it in Redis with a 24-hour expiry
+    await kv.set(cacheKey, dailyId, { ex: 86400 });
+  }
+
+  return allQuestions[dailyId];
+}
+
 export async function verifyAndSubmit(challengeId: number, userInput: string, userName: string, currentXp: number) {
   // 1. Find the challenge
   const challenge = (challengesData as Challenge[]).find(c => c.id === challengeId);
