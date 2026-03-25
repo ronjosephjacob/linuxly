@@ -20,9 +20,6 @@ export interface LinuxQuestion {
   answers: string[]; 
 }
 
-/**
- * Returns YYYY-MM-DD locked to Manila Time (GMT+8)
- */
 function getManilaDateString() {
   return new Intl.DateTimeFormat('en-CA', { 
     timeZone: 'Asia/Manila', 
@@ -61,22 +58,19 @@ export async function verifyAndSubmit(
 
   const alreadySolved = await kv.get(solveKey);
   if (alreadySolved) {
-    return { success: false, message: "⚠️ Access Denied: Already submitted today." };
+    return { success: false, message: "⚠️ Already submitted today." };
   }
 
   const challenge = (challengesData as RawChallenge[]).find(c => c.id === challengeId);
-  if (!challenge) return { success: false, message: "Critical: Challenge data missing." };
+  if (!challenge) return { success: false, message: "Critical: Data missing." };
 
   const clean = (str: string) => str.trim().toLowerCase().replace(/\/+$/, "").replace(/\s+/g, " ");
   const isCorrect = challenge.answers.some((ans) => clean(ans) === clean(userInput));
 
   if (isCorrect) {
     await kv.set(solveKey, true, { ex: 86400 });
-    
-    // Store user as "Name|Style|Seed" so the leaderboard can render their specific avatar
     const memberKey = `${userName}|${avatarConfig.style}|${avatarConfig.seed}`;
     await kv.zadd("leaderboard_alpha", { score: currentXp, member: memberKey });
-    
     return { success: true, message: "Success: Hash verified. XP synchronized." };
   }
 
