@@ -45,19 +45,23 @@ export async function getDailyChallengeAction() {
   return challengesData[dailyIndex] as LinuxQuestion;
 }
 
-export async function checkSolveStatus(userName: string) {
+export async function checkSolveStatus(userId: string) {
   const todayStr = getManilaDateString();
-  const solveKey = `solved:${todayStr}:${userName}`;
+  const solveKey = `solved:${todayStr}:${userId}`;
   const alreadySolved = await kv.get(solveKey);
   return !!alreadySolved; 
 }
 
-// NEW: Fetch Daily Global Stats
+// Fetch Daily Global Stats
 export async function getDailyStatsAction() {
   const todayStr = getManilaDateString();
   const totalUsers = await kv.scard(`daily_stats:${todayStr}:users`) || 0;
   const solved = await kv.get(`daily_stats:${todayStr}:solved`) as number || 0;
   const failed = await kv.get(`daily_stats:${todayStr}:failed`) as number || 0;
+  
+  // New: Fetch Hint Usage Stats
+  const solvedWithHint = await kv.get(`daily_stats:${todayStr}:solved_with_hint`) as number || 0;
+  const solvedWithoutHint = await kv.get(`daily_stats:${todayStr}:solved_without_hint`) as number || 0;
 
   const attemptsDist = [];
   for(let i = 1; i <= 5; i++) {
@@ -65,19 +69,25 @@ export async function getDailyStatsAction() {
     attemptsDist.push(Number(count));
   }
 
-  return { totalUsers, solved: Number(solved), failed: Number(failed), attemptsDist };
+  return { 
+    totalUsers, 
+    solved: Number(solved), 
+    failed: Number(failed), 
+    attemptsDist,
+    solvedWithHint: Number(solvedWithHint),
+    solvedWithoutHint: Number(solvedWithoutHint)
+  };
 }
 
 export async function verifyAndSubmit(
   challengeId: number, 
   userInput: string, 
-  userName: string, 
-  currentXp: number,
-  avatarConfig: { style: string; seed: string },
-  attemptNumber: number // Required to track how many tries it took
+  userId: string, 
+  attemptNumber: number,
+  usedHint: boolean
 ) {
   const todayStr = getManilaDateString();
-  const solveKey = `solved:${todayStr}:${userName}`;
+  const solveKey = `solved:${todayStr}:${userId}`;
 
   const alreadySolved = await kv.get(solveKey);
   if (alreadySolved) {
@@ -86,8 +96,8 @@ export async function verifyAndSubmit(
 
   // 1. Track unique user participation for the day
   const usersKey = `daily_stats:${todayStr}:users`;
-  await kv.sadd(usersKey, userName);
-  await kv.expire(usersKey, 172800); // Auto-delete after 48 hours to save DB space
+  await kv.sadd(usersKey, userId);
+  await kv.expire(usersKey, 172800); 
 
   const challenge = (challengesData as RawChallenge[]).find(c => c.id === challengeId);
   if (!challenge) return { success: false, message: "Critical: Data missing." };
@@ -98,23 +108,24 @@ export async function verifyAndSubmit(
   if (isCorrect) {
     // Save solve status
     await kv.set(solveKey, true, { ex: 86400 });
-    
-    // Preserve background leaderboard data
-    const memberKey = `${userName}|${avatarConfig.style}|${avatarConfig.seed}`;
-    await kv.zadd("leaderboard_alpha", { score: currentXp, member: memberKey });
 
     // Track Success Stats
     const solvedKey = `daily_stats:${todayStr}:solved`;
     const attemptKey = `daily_stats:${todayStr}:attempts:${attemptNumber}`;
+    const hintStatKey = `daily_stats:${todayStr}:${usedHint ? 'solved_with_hint' : 'solved_without_hint'}`;
+    
     await kv.incr(solvedKey);
     await kv.expire(solvedKey, 172800);
     await kv.incr(attemptKey);
     await kv.expire(attemptKey, 172800);
+    await kv.incr(hintStatKey);
+    await kv.expire(hintStatKey, 172800);
 
-    return { success: true, message: "Success: Hash verified. XP synchronized." };
+    // Removed XP synchronized message
+    return { success: true, message: "Success: Hash verified." };
   }
 
-  // Track Failure Stats (If max attempts reached)
+  // Track Failure Stats
   if (attemptNumber >= 5) {
     const failedKey = `daily_stats:${todayStr}:failed`;
     await kv.incr(failedKey);
@@ -122,27 +133,4 @@ export async function verifyAndSubmit(
   }
 
   return { success: false, message: "Error: Invalid command sequence." };
-}
-
-// Keeping this just in case you ever want to revert to the leaderboard UI
-export async function getLeaderboard() {
-  try {
-    const topUsers = await kv.zrange("leaderboard_alpha", 0, 9, { rev: true, withScores: true });
-    const formatted = [];
-    for (let i = 0; i < topUsers.length; i += 2) {
-      const rawMember = topUsers[i] as string;
-      const [name, style, seed] = rawMember.split('|');
-      formatted.push({ 
-        name: name || "Unknown", 
-        style: style || 'pixel-art', 
-        seed: seed || 'Tux', 
-        xp: topUsers[i + 1] as number 
-      });
-    }
-    return formatted;
-  } catch { return []; }
-}
-
-export async function getPlayerCount() {
-  try { return await kv.zcard("leaderboard_alpha"); } catch { return 0; }
 }
