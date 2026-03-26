@@ -4,223 +4,319 @@
     "difficulty": "easy",
     "question": "List all files in current directory",
     "answers": ["ls"],
-    "hint": "The command is a short 2-letter abbreviation for 'list'."
+    "hint": "The command is a short 2-letter abbreviation for 'list'.",
+    "addinfo1": "You can use 'ls -l' to see more details like file size, owner, and permissions.",
+    "addinfo2": "Try 'ls -S' to sort the list of files by their size, showing the largest files first.",
+    "usecase": "This is your primary way to 'look around' and see what files are available in your current workspace."
   },
   {
     "id": 2,
     "difficulty": "easy",
     "question": "List all files including hidden ones",
     "answers": ["ls -a", "ls -la"],
-    "hint": "You need the 'all' flag, which is usually represented by the letter 'a'."
+    "hint": "You need the 'all' flag, which is usually represented by the letter 'a'.",
+    "addinfo1": "Hidden files in Linux start with a dot (.), such as '.bashrc' or '.git'.",
+    "addinfo2": "Combining flags like 'ls -la' gives you a detailed 'long' list that also includes hidden files.",
+    "usecase": "Crucial for developers looking for configuration files or environment variables often hidden by the system."
   },
   {
     "id": 3,
     "difficulty": "easy",
     "question": "Change directory to documents",
     "answers": ["cd documents"],
-    "hint": "Use the 'change directory' command followed by the folder name."
+    "hint": "Use the 'change directory' command followed by the folder name.",
+    "addinfo1": "If the folder name has a space, you must wrap it in quotes: cd 'My Documents'.",
+    "addinfo2": "You can jump straight to a subfolder by providing the full path: cd documents/projects/web.",
+    "usecase": "Essential for navigating through your file system and moving between different project folders."
   },
   {
     "id": 4,
     "difficulty": "easy",
     "question": "Go back one directory",
     "answers": ["cd .."],
-    "hint": "In Linux, '..' represents the parent directory."
+    "hint": "In Linux, '..' represents the parent directory.",
+    "addinfo1": "You can go back two levels at once by typing 'cd ../..'.",
+    "addinfo2": "Typing 'cd -' will toggle you back to the previous directory you were just in.",
+    "usecase": "Saves time when you need to quickly hop out of a deep subfolder to reach a parent directory."
   },
   {
     "id": 5,
     "difficulty": "easy",
     "question": "Show current directory path",
     "answers": ["pwd"],
-    "hint": "Stands for 'Print Working Directory'."
+    "hint": "Stands for 'Print Working Directory'.",
+    "addinfo1": "Use 'pwd -P' if you want to see the physical path, resolving any symbolic links (shortcuts).",
+    "addinfo2": "The output of this command is often used in shell scripts to store the current location in a variable.",
+    "usecase": "Helpful when you are deep in subfolders and need the full path to copy into a configuration file or script."
   },
   {
     "id": 6,
     "difficulty": "easy",
     "question": "Create a folder named projects",
     "answers": ["mkdir projects"],
-    "hint": "Use the command to 'make directory'."
+    "hint": "Use the command to 'make directory'.",
+    "addinfo1": "You can make multiple directories at once by listing them: 'mkdir folder1 folder2 folder3'.",
+    "addinfo2": "Use 'mkdir -p project/src/app' to create a whole chain of subfolders even if the parents don't exist yet.",
+    "usecase": "Used constantly to organize your workspace and set up new project structures."
   },
   {
     "id": 7,
     "difficulty": "easy",
     "question": "Create an empty file named notes.txt",
     "answers": ["touch notes.txt"],
-    "hint": "This command 'touches' a file to create it if it doesn't exist."
+    "hint": "This command 'touches' a file to create it if it doesn't exist.",
+    "addinfo1": "If the file already exists, 'touch' simply updates its 'last modified' timestamp to the current time.",
+    "addinfo2": "You can create many empty files at once: 'touch index.html style.css script.js'.",
+    "usecase": "Quickly generating placeholder files or triggers for automated system tasks."
   },
   {
     "id": 8,
     "difficulty": "easy",
     "question": "Remove file temp.txt",
     "answers": ["rm temp.txt"],
-    "hint": "Short for 'remove'."
+    "hint": "Short for 'remove'.",
+    "addinfo1": "To remove a folder and everything inside it, you must use the recursive flag: 'rm -r foldername'.",
+    "addinfo2": "Use 'rm -f' (force) to delete files without the system asking you for confirmation.",
+    "usecase": "Used for cleaning up logs, temporary files, or deleting old projects. Warning: There is no 'Recycle Bin' in terminal!"
   },
   {
     "id": 9,
     "difficulty": "easy",
     "question": "Copy file1.txt to backup.txt",
     "answers": ["cp file1.txt backup.txt"],
-    "hint": "Use 'cp [source] [destination]'."
+    "hint": "Use 'cp [source] [destination]'.",
+    "addinfo1": "To copy an entire directory, use the recursive flag: 'cp -r folder1 folder1_backup'.",
+    "addinfo2": "Use 'cp -i' to get an interactive prompt before overwriting an existing file at the destination.",
+    "usecase": "Essential for creating manual backups of configuration files before you start editing them."
   },
   {
     "id": 10,
     "difficulty": "easy",
     "question": "Move file1.txt to documents/",
     "answers": ["mv file1.txt documents/"],
-    "hint": "The 'move' command is just two letters."
+    "hint": "The 'move' command is just two letters.",
+    "addinfo1": "You can move and rename at the same time: 'mv file.txt documents/new_name.txt'.",
+    "addinfo2": "You can use wildcards to move all files of a type: 'mv *.jpg images/'.",
+    "usecase": "The primary way to organize your files and move completed work into the appropriate folders."
   },
   {
     "id": 11,
     "difficulty": "medium",
     "question": "Show contents of file.txt",
     "answers": ["cat file.txt"],
-    "hint": "Think of 'concatenate'. Not the animal, but sounds like it!"
+    "hint": "Think of 'concatenate'. Not the animal, but sounds like it!",
+    "addinfo1": "Use 'cat -n file.txt' to view the content with line numbers included on the left.",
+    "addinfo2": "You can merge two files into a new one: 'cat file1.txt file2.txt > merged.txt'.",
+    "usecase": "Quickly peeking at the contents of a small text file without opening a full editor."
   },
   {
     "id": 12,
     "difficulty": "medium",
     "question": "Show first 10 lines of file.txt",
     "answers": ["head file.txt", "head -n 10 file.txt"],
-    "hint": "What is at the top of a body?"
+    "hint": "What is at the top of a body?",
+    "addinfo1": "You can change the number of lines shown: 'head -n 5 file.txt' shows only the first five.",
+    "addinfo2": "Useful for checking the file headers or metadata often found at the beginning of data files.",
+    "usecase": "Perfect for verifying you have the right file before processing a massive dataset."
   },
   {
     "id": 13,
     "difficulty": "medium",
     "question": "Show last 10 lines of file.txt",
     "answers": ["tail file.txt", "tail -n 10 file.txt"],
-    "hint": "What is at the very end of an animal?"
+    "hint": "What is at the very end of an animal?",
+    "addinfo1": "The '-f' (follow) flag is incredibly powerful: 'tail -f access.log' updates the screen live as new lines are added.",
+    "addinfo2": "You can start from a specific line: 'tail -n +20 file.txt' shows everything from line 20 to the end.",
+    "usecase": "The standard way to monitor server logs in real-time to watch for incoming errors or traffic."
   },
   {
     "id": 14,
     "difficulty": "medium",
     "question": "Search for 'error' in file.txt",
     "answers": ["grep error file.txt", "grep 'error' file.txt"],
-    "hint": "Use 'grep' to search for patterns in text."
+    "hint": "Use 'grep' to search for patterns in text.",
+    "addinfo1": "Use 'grep -i' to make the search case-insensitive, finding 'Error', 'ERROR', and 'error'.",
+    "addinfo2": "Use 'grep -v' to invert the search, showing every line that *doesn't* contain the word.",
+    "usecase": "The 'Swiss Army Knife' for finding specific information inside massive log files or codebases."
   },
   {
     "id": 15,
     "difficulty": "medium",
     "question": "Count lines in file.txt",
     "answers": ["wc -l file.txt"],
-    "hint": "Use the 'word count' command with the 'lines' flag."
+    "hint": "Use the 'word count' command with the 'lines' flag.",
+    "addinfo1": "Use 'wc -w' to count words or 'wc -c' to see the file size in bytes.",
+    "addinfo2": "If you leave out the filename, 'wc' will count input piped from another command.",
+    "usecase": "Commonly used to see how many entries are in a list or how many errors were found in a log."
   },
   {
     "id": 16,
     "difficulty": "medium",
     "question": "Find all .txt files",
     "answers": ["find . -name \"*.txt\"", "find . -name '*.txt'"],
-    "hint": "Use the 'find' command with the '-name' flag and a wildcard (*)."
+    "hint": "Use the 'find' command with the '-name' flag and a wildcard (*).",
+    "addinfo1": "You can limit the search depth: 'find . -maxdepth 1 -name \"*.txt\"' only looks in the current folder.",
+    "addinfo2": "You can search by file type: 'find . -type d' will list all directories (folders) instead of files.",
+    "usecase": "Crucial for locating files when you remember the name but forget which subfolder you put them in."
   },
   {
     "id": 17,
     "difficulty": "medium",
     "question": "List files in long format",
     "answers": ["ls -l"],
-    "hint": "Add the '-l' flag to the list command."
+    "hint": "Add the '-l' flag to the list command.",
+    "addinfo1": "Combine it with '-h' ('ls -lh') to see file sizes in 'human-readable' format (KB, MB, GB).",
+    "addinfo2": "The output shows the 'rwx' (read, write, execute) permissions for the owner, group, and others.",
+    "usecase": "Used to check if a file has the correct permissions to be modified or run as a program."
   },
   {
     "id": 18,
     "difficulty": "medium",
     "question": "Make script.sh executable",
     "answers": ["chmod +x script.sh"],
-    "hint": "You need to 'change mode' and add (+) the 'execute' (x) permission."
+    "hint": "You need to 'change mode' and add (+) the 'execute' (x) permission.",
+    "addinfo1": "You can also use numbers: 'chmod 755 script.sh' sets full permissions for the owner and read/execute for others.",
+    "addinfo2": "Use 'chmod -x' to remove the ability to run the file as a program.",
+    "usecase": "Required after creating a shell script before you can actually run it using './script.sh'."
   },
   {
     "id": 19,
     "difficulty": "medium",
     "question": "Rename old.txt to new.txt",
     "answers": ["mv old.txt new.txt"],
-    "hint": "In Linux, renaming is just moving a file to a new name."
+    "hint": "In Linux, renaming is just moving a file to a new name.",
+    "addinfo1": "Be careful! If 'new.txt' already exists, it will be overwritten without warning.",
+    "addinfo2": "Rename a directory using the same logic: 'mv old_folder new_folder'.",
+    "usecase": "Standard file management to fix typos or version your files (e.g., project_v1 to project_v2)."
   },
   {
     "id": 20,
     "difficulty": "medium",
     "question": "Open file.txt with paging",
     "answers": ["less file.txt"],
-    "hint": "This command is the opposite of 'more'."
+    "hint": "This command is the opposite of 'more'.",
+    "addinfo1": "While inside 'less', press '/' to search for text and 'n' to find the next occurrence.",
+    "addinfo2": "Unlike 'cat', 'less' doesn't load the whole file at once, making it safe for 5GB log files.",
+    "usecase": "The professional way to read large system files without freezing your terminal or slowing down the server."
   },
   {
     "id": 21,
     "difficulty": "hard",
     "question": "Count how many .txt files exist",
     "answers": ["ls *.txt | wc -l"],
-    "hint": "List the files, then pipe (|) the output to the word count command."
+    "hint": "List the files, then pipe (|) the output to the word count command.",
+    "addinfo1": "The pipe (|) symbol takes the 'output' of the left command and sends it as 'input' to the right command.",
+    "addinfo2": "If no files match, 'ls' might show an error. Use 'find . -name \"*.txt\" | wc -l' for a more robust count.",
+    "usecase": "Used to get quick statistics on a directory, like how many images or source files are present."
   },
   {
     "id": 22,
     "difficulty": "hard",
     "question": "Count lines containing 'error' in file.txt",
     "answers": ["grep error file.txt | wc -l"],
-    "hint": "Grep the word, then pipe the result to 'wc -l'."
+    "hint": "Grep the word, then pipe the result to 'wc -l'.",
+    "addinfo1": "This counts every line where the word appears at least once.",
+    "addinfo2": "Combine with 'grep -i' if you want to count both 'Error' and 'error'.",
+    "usecase": "Great for quantifying the severity of a system issue by seeing how many times an error triggered."
   },
   {
     "id": 23,
     "difficulty": "hard",
     "question": "Find all .log files containing 'fail'",
     "answers": ["grep -l fail *.log"],
-    "hint": "Use grep with the '-l' flag to list filenames only."
+    "hint": "Use grep with the '-l' flag to list filenames only.",
+    "addinfo1": "The '-l' flag stands for 'list files with matches', preventing the terminal from filling up with the actual lines of text.",
+    "addinfo2": "Add '-r' to search recursively through all subdirectories: 'grep -rl fail .'.",
+    "usecase": "Quickly identifying which specific log file among dozens contains the failure information you need."
   },
   {
     "id": 24,
     "difficulty": "hard",
     "question": "Sort contents of file.txt",
     "answers": ["sort file.txt"],
-    "hint": "The command is exactly what you want to do to the lines."
+    "hint": "The command is exactly what you want to do to the lines.",
+    "addinfo1": "Use 'sort -n' to sort numbers logically (1, 2, 10) instead of alphabetically (1, 10, 2).",
+    "addinfo2": "Use 'sort -r' to reverse the order (Z to A or highest number to lowest).",
+    "usecase": "Organizing lists of names, IDs, or IP addresses into a readable order."
   },
   {
     "id": 25,
     "difficulty": "hard",
     "question": "Remove duplicate lines from file.txt",
     "answers": ["sort file.txt | uniq"],
-    "hint": "You must sort the file first, then pipe to the 'unique' command."
+    "hint": "You must sort the file first, then pipe to the 'unique' command.",
+    "addinfo1": "The 'uniq' command only detects duplicates that are right next to each other, which is why sorting first is required.",
+    "addinfo2": "Use 'uniq -c' to see a count of how many times each unique line appeared.",
+    "usecase": "Cleaning up lists of exported data or finding all unique visitors in a web traffic log."
   },
   {
     "id": 26,
     "difficulty": "hard",
     "question": "Find files larger than 1MB",
     "answers": ["find . -size +1M"],
-    "hint": "Use find with the '-size' flag and '+1M'."
+    "hint": "Use find with the '-size' flag and '+1M'.",
+    "addinfo1": "You can use 'k' for Kilobytes, 'M' for Megabytes, and 'G' for Gigabytes.",
+    "addinfo2": "Combine it with '-delete' to automatically remove large temporary files (Be very careful!).",
+    "usecase": "Troubleshooting 'disk full' errors to find which massive files are eating up your storage space."
   },
   {
     "id": 27,
     "difficulty": "hard",
     "question": "Show all running processes",
     "answers": ["ps aux"],
-    "hint": "Think 'process status' with flags 'aux'."
+    "hint": "Think 'process status' with flags 'aux'.",
+    "addinfo1": "Pipe this to grep to find a specific app: 'ps aux | grep chrome'.",
+    "addinfo2": "The 'PID' column is the Process ID, which you need if you want to stop a program.",
+    "usecase": "Checking if your server software is currently running or if a specific program has crashed."
   },
   {
     "id": 28,
     "difficulty": "hard",
     "question": "Kill process with PID 1234",
     "answers": ["kill 1234"],
-    "hint": "The command is quite violent! Just the word followed by the number."
+    "hint": "The command is quite violent! Just the word followed by the number.",
+    "addinfo1": "If a process refuses to stop, use 'kill -9 1234' to force it to shut down immediately.",
+    "addinfo2": "You can use 'pkill firefox' to kill all processes with 'firefox' in the name without needing a PID.",
+    "usecase": "Stopping a background task that has frozen or is consuming too much CPU/RAM."
   },
   {
     "id": 29,
     "difficulty": "hard",
     "question": "Download a file named as 'file.txt' from a website named 'https://example.com'",
     "answers": ["curl -O https://example.com/file.txt"],
-    "hint": "Use 'curl' with the capital '-O' flag to save it."
+    "hint": "Use 'curl' with the capital '-O' flag to save it.",
+    "addinfo1": "The capital '-O' saves the file using its original name from the URL.",
+    "addinfo2": "Use lowercase '-o filename.txt' if you want to save it with a different name on your computer.",
+    "usecase": "The standard way to download installers, datasets, or scripts directly onto a Linux server."
   },
   {
     "id": 30,
     "difficulty": "hard",
     "question": "Compress logs folder into logs.tar.gz",
     "answers": ["tar -czvf logs.tar.gz logs/"],
-    "hint": "The flags stand for: Create, Zip (gzip), Verbose, File."
+    "hint": "The flags stand for: Create, Zip (gzip), Verbose, File.",
+    "addinfo1": "To extract this file later, use 'tar -xzvf logs.tar.gz'.",
+    "addinfo2": "The '-v' (verbose) flag shows you exactly which files are being added as the command runs.",
+    "usecase": "Used to group thousands of log files into one small file for easier backup or transfer to another computer."
   },
   {
     "id": 31,
     "difficulty": "expert",
     "question": "Count unique IP addresses in access.log",
     "answers": ["awk '{print $1}' access.log | sort | uniq | wc -l"],
-    "hint": "Use 'awk' to print the first column, then sort, then uniq, then count."
+    "hint": "Use 'awk' to print the first column, then sort, then uniq, then count.",
+    "addinfo1": "Awk is a powerful language; '$1' represents the first column, usually the IP address in standard web logs.",
+    "addinfo2": "You can change the separator with '-F', e.g., 'awk -F \",\"' for CSV files.",
+    "usecase": "Generating security reports to see how many unique visitors or attackers are hitting your site."
   },
   {
     "id": 32,
     "difficulty": "expert",
     "question": "Find top 5 most common words in file.txt",
     "answers": ["tr ' ' '\\n' < file.txt | sort | uniq -c | sort -nr | head -5"],
-    "hint": "Translate spaces to newlines, sort, count unique, sort numerically reversed, then take the top 5."
+    "hint": "Translate spaces to newlines, sort, count unique, sort numerically reversed, then take the top 5.",
+    "addinfo1": "The 'tr' command converts all spaces into new lines, putting every single word on its own line.",
+    "addinfo2": "'sort -nr' sorts the count (from 'uniq -c') numerically and in reverse (highest first).",
+    "usecase": "Performing quick text analysis or identifying trending keywords in a document directly from the terminal."
   }
 ]

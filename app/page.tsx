@@ -267,6 +267,8 @@ export default function Home() {
 
       {/* MAIN CONTENT */}
       <div className="lg:col-span-8 flex flex-col gap-6">
+        
+        {/* MISSION PANEL */}
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
           {loading ? (
             <div className="animate-pulse space-y-6"><div className="h-10 bg-slate-800 rounded w-3/4"></div><div className="h-20 bg-slate-800 rounded w-full"></div></div>
@@ -285,12 +287,12 @@ export default function Home() {
                 <a href={`https://tldr.inbrowser.app/pages/common/${getBaseCommand(challenge?.answers)}`} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-slate-500 hover:text-emerald-400 uppercase flex items-center gap-1 transition-colors tracking-tighter">LEARN MORE HERE! <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg></a>
               </div>
               <h1 className="text-2xl md:text-4xl font-semibold mb-6 leading-tight text-slate-50 tracking-tight">{challenge?.question}</h1>
-              {showHint && <div className="mb-6 p-5 bg-blue-500/5 border border-blue-500/20 rounded-2xl text-xs font-mono text-blue-300 leading-relaxed shadow-inner"><span className="text-blue-500 font-bold mr-2">HINT:</span>{challenge?.hint}</div>}
+              {showHint && <div className="mb-6 p-5 bg-blue-500/5 border border-blue-500/20 rounded-2xl text-xs font-mono text-blue-300 leading-relaxed shadow-inner"><span className="text-blue-500 font-bold mr-2">HINT_DECRYPTED:</span>{challenge?.hint}</div>}
               <div className="pt-6 border-t border-slate-800 flex justify-between items-center">
                  {!isGameOver && !showHint && (
                    <button onClick={() => setIsHintModalOpen(true)} className="text-[10px] font-bold text-slate-500 hover:text-blue-400 transition-colors flex items-center gap-1">
                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                     Need Assistance?
+                     Request Intelligence
                    </button>
                  )}
                  <div className="text-[10px] font-mono text-slate-600 bg-slate-950 px-3 py-1 rounded-full border border-slate-800">UPLINK_RESET: <span className="text-slate-400">{timeLeft}</span></div>
@@ -299,6 +301,7 @@ export default function Home() {
           )}
         </div>
 
+        {/* TERMINAL */}
         <div className="bg-[#0b0e14] rounded-3xl border border-slate-800 flex flex-col flex-1 min-h-[450px] shadow-2xl relative overflow-hidden group">
           <div className="px-6 py-3 border-b border-slate-800 flex justify-between items-center text-[10px] font-mono text-slate-600 uppercase tracking-widest">Console v2.4.1</div>
           <div className="p-6 overflow-y-auto font-mono text-sm space-y-2 flex-1 custom-scrollbar">
@@ -314,6 +317,49 @@ export default function Home() {
             <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />Live Sync</div>
           </div>
         </div>
+
+        {/* NEW FEATURE: INTEL UNLOCKED BOX */}
+        {isSolved && challenge && (challenge.addinfo1 || challenge.usecase) && (
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h3 className="text-xl font-bold text-emerald-400 mb-6 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Command Intelligence Unlocked
+            </h3>
+
+            <div className="space-y-6">
+              {/* Additional Information Section */}
+              {(challenge.addinfo1 || challenge.addinfo2) && (
+                <div>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Advanced Usage</h4>
+                  <div className="space-y-3">
+                    {challenge.addinfo1 && (
+                      <div className="bg-[#0b0e14] p-4 rounded-2xl border border-slate-800 text-sm text-slate-300 leading-relaxed">
+                        <span className="text-emerald-500 font-bold mr-3">&gt;</span>{challenge.addinfo1}
+                      </div>
+                    )}
+                    {challenge.addinfo2 && (
+                      <div className="bg-[#0b0e14] p-4 rounded-2xl border border-slate-800 text-sm text-slate-300 leading-relaxed">
+                        <span className="text-emerald-500 font-bold mr-3">&gt;</span>{challenge.addinfo2}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Real-World Use Case Section */}
+              {challenge.usecase && (
+                <div>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Field Application</h4>
+                  <div className="bg-emerald-500/5 border border-emerald-500/20 p-5 rounded-2xl text-sm leading-relaxed text-emerald-100/80 shadow-inner">
+                    <span className="text-emerald-400 font-bold mr-2 uppercase tracking-wide">Use_Case:</span>
+                    {challenge.usecase}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </main>
   );

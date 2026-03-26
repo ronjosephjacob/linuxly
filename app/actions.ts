@@ -4,12 +4,16 @@ import challengesData from "../data/challenges.json";
 
 const kv = Redis.fromEnv()
 
+// Added new JSON fields to the interfaces
 interface RawChallenge {
   id: number;
   answers: string[];
   question: string;
   hint: string;
   difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  addinfo1?: string;
+  addinfo2?: string;
+  usecase?: string;
 }
 
 export interface LinuxQuestion {
@@ -18,6 +22,9 @@ export interface LinuxQuestion {
   hint: string;
   difficulty: 'easy' | 'medium' | 'hard' | 'expert';
   answers: string[]; 
+  addinfo1?: string;
+  addinfo2?: string;
+  usecase?: string;
 }
 
 function getManilaDateString() {
