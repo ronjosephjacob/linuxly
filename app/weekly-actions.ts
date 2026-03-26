@@ -59,11 +59,14 @@ export interface WeekDay {
  * Duplicate challenges (same id) are de-duplicated so each question appears at most once.
  */
 export async function getWeeklyRecapAction(userId: string): Promise<WeekDay[]> {
+  const nowManila = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  const dayOfWeek = nowManila.getDay(); // 0=Sun, 1=Mon, ...
+  const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1); // Monday = start
+
   const days: WeekDay[] = [];
   const seenIds = new Set<number>();
 
-  // Walk from 6 days ago up through today (index 0 = 6 days ago, index 6 = today)
-  for (let offset = -6; offset <= 0; offset++) {
+  for (let offset = mondayOffset; offset <= 0; offset++) {
     const dateStr = manilaDateOffset(offset);
     const challenge = getChallengeForDate(dateStr);
 
@@ -79,15 +82,16 @@ export async function getWeeklyRecapAction(userId: string): Promise<WeekDay[]> {
     });
 
     // Pull stats from Redis
-    const [totalUsers, solved, failed, solvedWithHint, solvedWithoutHint] = await Promise.all([
+    const [totalUsers, solved, failed, solvedWithHint, solvedWithoutHint, ...attemptCounts] = await Promise.all([
       kv.scard(`daily_stats:${dateStr}:users`).catch(() => 0),
       kv.get(`daily_stats:${dateStr}:solved`).catch(() => 0),
       kv.get(`daily_stats:${dateStr}:failed`).catch(() => 0),
       kv.get(`daily_stats:${dateStr}:solved_with_hint`).catch(() => 0),
       kv.get(`daily_stats:${dateStr}:solved_without_hint`).catch(() => 0),
+      ...([1,2,3,4,5].map(i => kv.get(`daily_stats:${dateStr}:attempts:${i}`).catch(() => 0))),
     ]);
 
-    const attemptsDist: number[] = [];
+    const attemptsDist = attemptCounts.map(Number);
     for (let i = 1; i <= 5; i++) {
       const v = await kv.get(`daily_stats:${dateStr}:attempts:${i}`).catch(() => 0);
       attemptsDist.push(Number(v));

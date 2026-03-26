@@ -106,15 +106,19 @@ export default function Home() {
     setWeeklyRecap(recap);
   }, []);
 
+  // Phase 1: Load challenge immediately on mount
   useEffect(() => {
-    if (mounted && userId) { 
-      syncChallenge(userId); 
+    if (mounted && userId) {
+      syncChallenge(userId);
       fetchStats();
-      fetchWeeklyRecap(userId);
     }
-  }, [mounted, userId, syncChallenge, fetchStats, fetchWeeklyRecap]);
+  }, [mounted, userId, syncChallenge, fetchStats]);
 
+  // Phase 2: Load weekly recap AFTER challenge is ready (not loading)
   useEffect(() => {
+    if (!loading && userId) {
+    fetchWeeklyRecap(userId);
+    }
     const timer = setInterval(() => {
       const phMidnight = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Manila"}));
       phMidnight.setHours(24, 0, 0, 0);
@@ -126,7 +130,7 @@ export default function Home() {
       setTimeLeft(`${h}:${m}:${s}`);
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [loading, userId, fetchWeeklyRecap]);
 
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -338,7 +342,7 @@ export default function Home() {
                         <div>
                           <div className="flex justify-between text-[9px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">
                             <span className="flex items-center gap-1">
-                              <span className="inline-block w-2 h-2 rounded-sm bg-emerald-500/40" /> w/ Hint
+                              <span className="inline-block w-2 h-2 rounded-sm bg-orange-400/60" /> w/ Hint
                             </span>
                             <span className="flex items-center gap-1">
                               No Hint <span className="inline-block w-2 h-2 rounded-sm bg-emerald-500" />
@@ -350,7 +354,7 @@ export default function Home() {
                           <div className="flex h-3 rounded-full overflow-hidden bg-slate-900 border border-slate-800 w-full">
                             {/* solved with hint  = dashed/muted green */}
                             <div
-                              className="bg-emerald-500/40 transition-all duration-700"
+                              className="bg-orange-400/60 transition-all duration-700"
                               style={{ width: `${s.totalUsers > 0 ? (s.solvedWithHint / s.totalUsers) * 100 : 0}%` }}
                             />
                             {/* solved without hint = solid green */}
@@ -365,7 +369,7 @@ export default function Home() {
                             />
                           </div>
                           <div className="flex justify-between text-[9px] font-mono mt-1.5">
-                            <span className="text-emerald-400/70">{s.solvedWithHint} hint</span>
+                            <span className="text-orange-400">{s.solvedWithHint} hint</span>
                             <span className="text-emerald-400">{s.solvedWithoutHint} clean</span>
                             <span className="text-rose-400/70">{s.failed} failed</span>
                           </div>
