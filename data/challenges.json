@@ -35,7 +35,7 @@
     "question": "Go back one directory",
     "answers": ["cd .."],
     "hint": "In Linux, '..' represents the parent directory.",
-    "addinfo1": "You can go back two levels at once by typing 'cd ../..'.",
+    "addinfo1": "You can go back two levels at once by typing 'cd ..'.",
     "addinfo2": "Typing 'cd -' will toggle you back to the previous directory you were just in.",
     "usecase": "Saves time when you need to quickly hop out of a deep subfolder to reach a parent directory."
   },

@@ -8,6 +8,8 @@ import {
   LinuxQuestion 
 } from "./actions";
 
+import { getWeeklyRecapAction, WeekDay } from "./weekly-actions";
+
 interface DailyStats {
   totalUsers: number;
   solved: number;
@@ -40,6 +42,8 @@ export default function Home() {
   const [dailyStats, setDailyStats] = useState<DailyStats>({ 
     totalUsers: 0, solved: 0, failed: 0, attemptsDist: [0,0,0,0,0], solvedWithHint: 0, solvedWithoutHint: 0 
   });
+  const [weeklyRecap, setWeeklyRecap] = useState<WeekDay[]>([]);
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
   
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const MAX_ATTEMPTS = 5;
@@ -96,12 +100,19 @@ export default function Home() {
     }
   }, []);
 
+  const fetchWeeklyRecap = useCallback(async (id: string) => {
+    if (!id) return;
+    const recap = await getWeeklyRecapAction(id);
+    setWeeklyRecap(recap);
+  }, []);
+
   useEffect(() => {
     if (mounted && userId) { 
       syncChallenge(userId); 
-      fetchStats(); 
+      fetchStats();
+      fetchWeeklyRecap(userId);
     }
-  }, [mounted, userId, syncChallenge, fetchStats]);
+  }, [mounted, userId, syncChallenge, fetchStats, fetchWeeklyRecap]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -253,6 +264,143 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* WEEKLY RECAP */}
+        {weeklyRecap.length > 0 && (
+          <div className="bg-slate-900/40 rounded-3xl border border-slate-800/50 overflow-hidden shadow-inner">
+            <div className="bg-slate-900/80 px-6 py-4 border-b border-slate-800 flex flex-col gap-1">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest font-mono">Weekly Recap</h3>
+              <span className="text-[10px] font-mono text-slate-500">Last 7 days of missions</span>
+            </div>
+            <div className="divide-y divide-slate-800/60">
+              {weeklyRecap.map((day) => {
+                const isExpanded = expandedDay === day.dateStr;
+                const s = day.stats;
+                const wrongPct      = s.totalUsers   > 0 ? Math.round((s.failed           / s.totalUsers) * 100) : 0;
+                const successPct    = s.totalUsers   > 0 ? Math.round((s.solved           / s.totalUsers) * 100) : 0;
+
+                const dotColor =
+                  day.userResult === true  ? 'bg-emerald-500' :
+                  day.userResult === false ? 'bg-amber-500'   :
+                                             'bg-slate-600';
+                const rowBg =
+                  day.userResult === true  ? 'hover:bg-emerald-500/5' :
+                  day.userResult === false ? 'hover:bg-amber-500/5'   :
+                                             'hover:bg-slate-800/30';
+
+                return (
+                  <div key={day.dateStr}>
+                    {/* Clickable row */}
+                    <button
+                      onClick={() => setExpandedDay(isExpanded ? null : day.dateStr)}
+                      className={`w-full flex items-center gap-3 px-5 py-3 text-left transition-colors ${rowBg} group`}
+                    >
+                      {/* Status dot */}
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
+
+                      {/* Date label */}
+                      <span className="text-[11px] font-mono text-slate-400 w-20 shrink-0">{day.label}</span>
+
+                      {/* Question truncated */}
+                      <span className="text-[11px] text-slate-300 flex-1 truncate font-medium">
+                        {day.questionName}
+                      </span>
+
+                      {/* Difficulty badge */}
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border shrink-0 ${
+                        day.difficulty === 'easy'   ? 'text-emerald-400 border-emerald-500/30' :
+                        day.difficulty === 'medium' ? 'text-amber-400   border-amber-500/30'   :
+                        day.difficulty === 'hard'   ? 'text-rose-400    border-rose-500/30'     :
+                                                      'text-purple-400  border-purple-500/30'
+                      }`}>{day.difficulty}</span>
+
+                      {/* Chevron */}
+                      <svg
+                        className={`w-3 h-3 text-slate-600 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Expanded stats */}
+                    {isExpanded && (
+                      <div className="bg-slate-950/60 px-5 py-4 border-t border-slate-800/60 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+
+                        {/* Participation row */}
+                        <div className="flex justify-between text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+                          <span>{s.totalUsers} operators</span>
+                          <span className="text-emerald-400">{successPct}% solved</span>
+                          <span className="text-rose-400">{wrongPct}% failed</span>
+                        </div>
+
+                        {/* Solve intelligence bar  (------XXYYYYY) style */}
+                        <div>
+                          <div className="flex justify-between text-[9px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">
+                            <span className="flex items-center gap-1">
+                              <span className="inline-block w-2 h-2 rounded-sm bg-emerald-500/40" /> w/ Hint
+                            </span>
+                            <span className="flex items-center gap-1">
+                              No Hint <span className="inline-block w-2 h-2 rounded-sm bg-emerald-500" />
+                            </span>
+                            <span className="flex items-center gap-1">
+                              Wrong <span className="inline-block w-2 h-2 rounded-sm bg-rose-500/60" />
+                            </span>
+                          </div>
+                          <div className="flex h-3 rounded-full overflow-hidden bg-slate-900 border border-slate-800 w-full">
+                            {/* solved with hint  = dashed/muted green */}
+                            <div
+                              className="bg-emerald-500/40 transition-all duration-700"
+                              style={{ width: `${s.totalUsers > 0 ? (s.solvedWithHint / s.totalUsers) * 100 : 0}%` }}
+                            />
+                            {/* solved without hint = solid green */}
+                            <div
+                              className="bg-emerald-500 transition-all duration-700"
+                              style={{ width: `${s.totalUsers > 0 ? (s.solvedWithoutHint / s.totalUsers) * 100 : 0}%` }}
+                            />
+                            {/* wrong = rose */}
+                            <div
+                              className="bg-rose-500/60 transition-all duration-700"
+                              style={{ width: `${s.totalUsers > 0 ? (s.failed / s.totalUsers) * 100 : 0}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[9px] font-mono mt-1.5">
+                            <span className="text-emerald-400/70">{s.solvedWithHint} hint</span>
+                            <span className="text-emerald-400">{s.solvedWithoutHint} clean</span>
+                            <span className="text-rose-400/70">{s.failed} failed</span>
+                          </div>
+                        </div>
+
+                        {/* Attempts distribution */}
+                        <div>
+                          <h4 className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-2">Solves by Attempt</h4>
+                          <div className="space-y-1.5">
+                            {s.attemptsDist.map((count, idx) => {
+                              const pct = s.solved > 0 ? Math.round((count / s.solved) * 100) : 0;
+                              return (
+                                <div key={idx} className="flex items-center gap-2 text-[10px] font-mono">
+                                  <span className="text-slate-500 w-10 text-right shrink-0">Try {idx + 1}</span>
+                                  <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-emerald-500/50 transition-all duration-700"
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-slate-600 w-6 shrink-0">{count}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* MAIN CONTENT */}
