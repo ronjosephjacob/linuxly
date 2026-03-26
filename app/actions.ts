@@ -4,7 +4,6 @@ import challengesData from "../data/challenges.json";
 
 const kv = Redis.fromEnv()
 
-// Added new JSON fields to the interfaces
 interface RawChallenge {
   id: number;
   answers: string[];
@@ -53,12 +52,29 @@ export async function checkSolveStatus(userName: string) {
   return !!alreadySolved; 
 }
 
+// NEW: Fetch Daily Global Stats
+export async function getDailyStatsAction() {
+  const todayStr = getManilaDateString();
+  const totalUsers = await kv.scard(`daily_stats:${todayStr}:users`) || 0;
+  const solved = await kv.get(`daily_stats:${todayStr}:solved`) as number || 0;
+  const failed = await kv.get(`daily_stats:${todayStr}:failed`) as number || 0;
+
+  const attemptsDist = [];
+  for(let i = 1; i <= 5; i++) {
+    const count = await kv.get(`daily_stats:${todayStr}:attempts:${i}`) as number || 0;
+    attemptsDist.push(Number(count));
+  }
+
+  return { totalUsers, solved: Number(solved), failed: Number(failed), attemptsDist };
+}
+
 export async function verifyAndSubmit(
   challengeId: number, 
   userInput: string, 
   userName: string, 
   currentXp: number,
-  avatarConfig: { style: string; seed: string } 
+  avatarConfig: { style: string; seed: string },
+  attemptNumber: number // Required to track how many tries it took
 ) {
   const todayStr = getManilaDateString();
   const solveKey = `solved:${todayStr}:${userName}`;
@@ -68,6 +84,11 @@ export async function verifyAndSubmit(
     return { success: false, message: "⚠️ Already submitted today." };
   }
 
+  // 1. Track unique user participation for the day
+  const usersKey = `daily_stats:${todayStr}:users`;
+  await kv.sadd(usersKey, userName);
+  await kv.expire(usersKey, 172800); // Auto-delete after 48 hours to save DB space
+
   const challenge = (challengesData as RawChallenge[]).find(c => c.id === challengeId);
   if (!challenge) return { success: false, message: "Critical: Data missing." };
 
@@ -75,15 +96,35 @@ export async function verifyAndSubmit(
   const isCorrect = challenge.answers.some((ans) => clean(ans) === clean(userInput));
 
   if (isCorrect) {
+    // Save solve status
     await kv.set(solveKey, true, { ex: 86400 });
+    
+    // Preserve background leaderboard data
     const memberKey = `${userName}|${avatarConfig.style}|${avatarConfig.seed}`;
     await kv.zadd("leaderboard_alpha", { score: currentXp, member: memberKey });
+
+    // Track Success Stats
+    const solvedKey = `daily_stats:${todayStr}:solved`;
+    const attemptKey = `daily_stats:${todayStr}:attempts:${attemptNumber}`;
+    await kv.incr(solvedKey);
+    await kv.expire(solvedKey, 172800);
+    await kv.incr(attemptKey);
+    await kv.expire(attemptKey, 172800);
+
     return { success: true, message: "Success: Hash verified. XP synchronized." };
+  }
+
+  // Track Failure Stats (If max attempts reached)
+  if (attemptNumber >= 5) {
+    const failedKey = `daily_stats:${todayStr}:failed`;
+    await kv.incr(failedKey);
+    await kv.expire(failedKey, 172800);
   }
 
   return { success: false, message: "Error: Invalid command sequence." };
 }
 
+// Keeping this just in case you ever want to revert to the leaderboard UI
 export async function getLeaderboard() {
   try {
     const topUsers = await kv.zrange("leaderboard_alpha", 0, 9, { rev: true, withScores: true });

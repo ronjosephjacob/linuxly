@@ -2,8 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { 
   verifyAndSubmit, 
-  getLeaderboard, 
-  getPlayerCount, 
+  getDailyStatsAction,
   getDailyChallengeAction, 
   checkSolveStatus,
   LinuxQuestion 
@@ -25,8 +24,11 @@ const AVATAR_PRESETS = [
   { seed: "Byte", style: "bottts" }, { seed: "Sky", style: "adventurer" },
 ];
 
-interface LeaderboardUser {
-  name: string; style: string; seed: string; xp: number;
+interface DailyStats {
+  totalUsers: number;
+  solved: number;
+  failed: number;
+  attemptsDist: number[];
 }
 
 export default function Home() {
@@ -52,8 +54,7 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState("");
 
   // --- GLOBAL DATA ---
-  const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardUser[]>([]);
-  const [totalPlayers, setTotalPlayers] = useState(0);
+  const [dailyStats, setDailyStats] = useState<DailyStats>({ totalUsers: 0, solved: 0, failed: 0, attemptsDist: [0,0,0,0,0] });
   
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const MAX_ATTEMPTS = 5;
@@ -81,18 +82,30 @@ export default function Home() {
       const sName = localStorage.getItem("linuxly_name");
       const sAvatar = localStorage.getItem("linuxly_avatar_config");
       const sStreak = localStorage.getItem("linuxly_streak");
+      const sAttemptsDate = localStorage.getItem("linuxly_attempts_date");
+      const sAttempts = localStorage.getItem("linuxly_attempts");
+      
       if (sXp) setXp(parseInt(sXp));
       if (sName) setUserName(sName);
       if (sAvatar) setAvatarConfig(JSON.parse(sAvatar));
       if (sStreak) setStreak(parseInt(sStreak));
+
+      // Reset attempts if it's a new day to prevent refresh-cheating
+      const today = new Date().toDateString();
+      if (sAttemptsDate === today && sAttempts) {
+        setAttempts(parseInt(sAttempts));
+      } else {
+        localStorage.setItem("linuxly_attempts_date", today);
+        localStorage.setItem("linuxly_attempts", "0");
+      }
+
       setMounted(true);
     }
   }, []);
 
-  const fetchRankings = useCallback(async () => {
-    const [data, count] = await Promise.all([getLeaderboard(), getPlayerCount()]);
-    if (data) setGlobalLeaderboard(data as LeaderboardUser[]);
-    if (count !== undefined) setTotalPlayers(count);
+  const fetchStats = useCallback(async () => {
+    const stats = await getDailyStatsAction();
+    if (stats) setDailyStats(stats);
   }, []);
 
   const syncChallenge = useCallback(async (name: string) => {
@@ -111,8 +124,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (mounted) { syncChallenge(userName); fetchRankings(); }
-  }, [mounted, syncChallenge, userName, fetchRankings]);
+    if (mounted) { syncChallenge(userName); fetchStats(); }
+  }, [mounted, syncChallenge, userName, fetchStats]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -151,7 +164,9 @@ export default function Home() {
     setIsChecking(true); setInput("");
     const gain = showHint ? 12 : 25;
     const potentialXp = xp + gain;
-    const res = await verifyAndSubmit(challenge.id, cmd, userName, potentialXp, avatarConfig);
+    const currentAttempt = attempts + 1;
+    
+    const res = await verifyAndSubmit(challenge.id, cmd, userName, potentialXp, avatarConfig, currentAttempt);
 
     if (res.success) {
       setXp(potentialXp);
@@ -161,11 +176,12 @@ export default function Home() {
       localStorage.setItem("linuxly_streak", newStreak.toString());
       setIsSolved(true);
       setHistory(prev => [...prev, { text: `${userName.toLowerCase()}@linuxly:~$ ${cmd}`, type: 'cmd' }, { text: `[SUCCESS] ${res.message} (+${gain} XP)`, type: 'resp' }]);
-      fetchRankings();
+      fetchStats();
     } else {
-      const nextAttempts = attempts + 1;
-      setAttempts(nextAttempts);
-      setHistory(prev => [...prev, { text: `${userName.toLowerCase()}@linuxly:~$ ${cmd}`, type: 'cmd' }, { text: nextAttempts >= MAX_ATTEMPTS ? "❌ LOCKOUT: Max attempts reached." : `❌ ${res.message}`, type: 'resp' }]);
+      setAttempts(currentAttempt);
+      localStorage.setItem("linuxly_attempts", currentAttempt.toString());
+      setHistory(prev => [...prev, { text: `${userName.toLowerCase()}@linuxly:~$ ${cmd}`, type: 'cmd' }, { text: currentAttempt >= MAX_ATTEMPTS ? "❌ LOCKOUT: Max attempts reached." : `❌ ${res.message}`, type: 'resp' }]);
+      if (currentAttempt >= MAX_ATTEMPTS) fetchStats(); // Refresh stats to show failure
     }
     setIsChecking(false);
   };
@@ -245,22 +261,55 @@ export default function Home() {
           <div className="mt-3 text-[9px] font-mono text-slate-600 text-right uppercase">Skin ID: {AVATAR_PRESETS.findIndex(p => p.seed === avatarConfig.seed) + 1}</div>
         </div>
 
+        {/* DAILY GLOBAL STATS UI */}
         <div className="bg-slate-900/40 rounded-3xl border border-slate-800/50 flex-1 overflow-hidden flex flex-col shadow-inner">
-          <div className="bg-slate-900/80 px-6 py-4 border-b border-slate-800 flex justify-between items-center">
-            <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest font-mono">Leaderboard</h3>
-            <span className="text-[10px] font-mono text-slate-600 px-2 py-1 bg-slate-950 rounded-md">{totalPlayers} active</span>
+          <div className="bg-slate-900/80 px-6 py-4 border-b border-slate-800 flex flex-col gap-1">
+            <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest font-mono">Global Stats</h3>
+            <span className="text-[10px] font-mono text-slate-500">See how others fare to today&apos;s question</span>
           </div>
-          <div className="p-4 space-y-2 overflow-y-auto custom-scrollbar">
-            {globalLeaderboard.map((u, i) => (
-              <div key={i} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${u.name === userName ? 'bg-emerald-500/5 border-emerald-500/20 shadow-[0_0_15px_-5px_rgba(16,185,129,0.2)]' : 'bg-slate-900/50 border-transparent hover:border-slate-700'}`}>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-mono text-slate-600 w-4">{i + 1}.</span>
-                  <img src={`https://api.dicebear.com/7.x/${u.style}/svg?seed=${u.seed}`} className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700" alt="" />
-                  <span className={`text-sm font-medium ${u.name === userName ? 'text-emerald-400' : 'text-slate-300'}`}>{u.name}</span>
-                </div>
-                <span className="font-mono text-sm text-emerald-500 font-bold">{u.xp}</span>
+          
+          <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+            {/* Operator Count */}
+            <div className="flex justify-between items-center bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
+               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Operators</span>
+               <span className="text-lg font-mono text-emerald-400">{dailyStats.totalUsers}</span>
+            </div>
+
+            {/* Success & Failure Rates */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/20 flex flex-col items-center justify-center">
+                <span className="text-[10px] text-emerald-500/70 font-bold uppercase tracking-widest mb-1">Success</span>
+                <span className="text-3xl font-mono text-emerald-400">
+                  {dailyStats.totalUsers > 0 ? Math.round((dailyStats.solved / dailyStats.totalUsers) * 100) : 0}%
+                </span>
               </div>
-            ))}
+              <div className="bg-rose-500/10 p-4 rounded-2xl border border-rose-500/20 flex flex-col items-center justify-center">
+                <span className="text-[10px] text-rose-500/70 font-bold uppercase tracking-widest mb-1">Failed</span>
+                <span className="text-3xl font-mono text-rose-400">
+                  {dailyStats.totalUsers > 0 ? Math.round((dailyStats.failed / dailyStats.totalUsers) * 100) : 0}%
+                </span>
+              </div>
+            </div>
+
+            {/* Attempts Breakdown Chart */}
+            <div className="pt-2">
+               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Solves by Attempt Count</h4>
+               <div className="space-y-3">
+                 {dailyStats.attemptsDist.map((count, index) => {
+                    // Calculate percentage relative to total solves to scale the bars
+                    const percentage = dailyStats.solved > 0 ? Math.round((count / dailyStats.solved) * 100) : 0;
+                    return (
+                      <div key={index} className="flex items-center gap-3 text-xs font-mono">
+                        <span className="text-slate-400 w-12 text-right">Try {index + 1}</span>
+                        <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500/50 transition-all duration-1000" style={{ width: `${percentage}%` }}></div>
+                        </div>
+                        <span className="text-slate-500 w-8">{count}</span>
+                      </div>
+                    )
+                 })}
+               </div>
+            </div>
           </div>
         </div>
       </div>
@@ -318,7 +367,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* NEW FEATURE: INTEL UNLOCKED BOX */}
+        {/* INTEL UNLOCKED BOX */}
         {isSolved && challenge && (challenge.addinfo1 || challenge.usecase) && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h3 className="text-xl font-bold text-emerald-400 mb-6 flex items-center gap-2">
@@ -327,7 +376,6 @@ export default function Home() {
             </h3>
 
             <div className="space-y-6">
-              {/* Additional Information Section */}
               {(challenge.addinfo1 || challenge.addinfo2) && (
                 <div>
                   <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Advanced Usage</h4>
@@ -346,7 +394,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Real-World Use Case Section */}
               {challenge.usecase && (
                 <div>
                   <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Field Application</h4>
