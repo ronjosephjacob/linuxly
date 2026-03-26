@@ -6,13 +6,12 @@ const kv = Redis.fromEnv()
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function getManilaDateString(date?: Date) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Manila',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date ?? new Date());
+function getManilaDateString(): string {
+  const target = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  const y = target.getUTCFullYear();
+  const m = String(target.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(target.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 /** Returns the challenge index (and therefore which challenge) for any given date */
@@ -26,9 +25,15 @@ function getChallengeForDate(dateStr: string) {
 
 /** Returns an ISO date string (YYYY-MM-DD) shifted by `days` relative to Manila today */
 function manilaDateOffset(days: number): string {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-  now.setDate(now.getDate() + days);
-  return getManilaDateString(now);
+  // Get current UTC ms, add Manila offset (+8h), then add day offset
+  const utcNow = Date.now();
+  const manilaOffset = 8 * 60 * 60 * 1000;
+  const target = new Date(utcNow + manilaOffset + days * 86400000);
+  // Format as YYYY-MM-DD from the UTC values of the shifted date
+  const y = target.getUTCFullYear();
+  const m = String(target.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(target.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 // ── types ─────────────────────────────────────────────────────────────────────
@@ -58,7 +63,10 @@ export interface WeekDay {
  * Days that haven't happened yet are excluded.
  * Duplicate challenges (same id) are de-duplicated so each question appears at most once.
  */
-export async function getWeeklyRecapAction(userId: string): Promise<WeekDay[]> {
+export async function getWeeklyRecapAction(
+  userId: string,
+  cachedResults: Record<string, boolean | null> = {}
+): Promise<WeekDay[]> {
   const nowManila = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
   const dayOfWeek = nowManila.getDay(); // 0=Sun, 1=Mon, ...
   const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1); // Monday = start
@@ -92,26 +100,21 @@ export async function getWeeklyRecapAction(userId: string): Promise<WeekDay[]> {
     ]);
 
     const attemptsDist = attemptCounts.map(Number);
-    for (let i = 1; i <= 5; i++) {
-      const v = await kv.get(`daily_stats:${dateStr}:attempts:${i}`).catch(() => 0);
-      attemptsDist.push(Number(v));
-    }
 
     // Did this user participate?
     let userResult: boolean | null = null;
-    const solveKey = `solved:${dateStr}:${userId}`;
-    const solveVal = await kv.get(solveKey).catch(() => null);
-
-    if (solveVal !== null) {
-      // They solved it
-      userResult = true;
-    } else {
-      // Check if they attempted but failed – we track failure per-user via a separate key
-      const failKey = `failed:${dateStr}:${userId}`;
-      const failVal = await kv.get(failKey).catch(() => null);
-      if (failVal !== null) userResult = false;
-      // else null = didn't participate
-    }
+      if (dateStr in cachedResults) {
+        userResult = cachedResults[dateStr];
+      } else {
+        // fall back to Redis check
+        const solveVal = await kv.get(`solved:${dateStr}:${userId}`).catch(() => null);
+        if (solveVal !== null) {
+          userResult = true;
+        } else {
+          const failVal = await kv.get(`failed:${dateStr}:${userId}`).catch(() => null);
+          if (failVal !== null) userResult = false;
+        }
+      }
 
     days.push({
       dateStr,

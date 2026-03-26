@@ -130,6 +130,9 @@ export async function verifyAndSubmit(
     const failedKey = `daily_stats:${todayStr}:failed`;
     await kv.incr(failedKey);
     await kv.expire(failedKey, 172800);
+    // Track per-user failure so weekly recap can colour-code the day
+    const userFailKey = `failed:${todayStr}:${userId}`;
+    await kv.set(userFailKey, true, { ex: 172800 });
   }
 
   return { success: false, message: "Error: Invalid command sequence." };
