@@ -205,6 +205,7 @@ export default function Home() {
   }, [history]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const solveMessageRef = useRef<HTMLDivElement>(null);
 
   // --- HANDLERS ---
   const handleCommand = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -221,13 +222,43 @@ export default function Home() {
     if (res.success) {
       const todayStr = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
       setCachedDayResult(todayStr, true);
-      setIsSolved(true);
-      setHistory(prev => [...prev,
-        { text: `operator@linuxly:~$ ${cmd}`, type: 'cmd' },
-        { text: `[SUCCESS] ${res.message}`, type: 'resp' }
-      ]);
+
+      // Fetch fresh stats first so percentile reflects the user's own submission
       await fetchStats();
       fetchWeeklyRecap(userId);
+
+      // Read latest stats via updater to compute accurate percentile immediately
+      setDailyStats(latest => {
+        const solverCount = latest.solved;
+        const fasterThan = (latest.attemptsDist ?? [])
+          .slice(0, currentAttempt - 1)
+          .reduce((a: number, b: number) => a + b, 0);
+        const fasterThanPct = solverCount > 0
+          ? Math.round((fasterThan / solverCount) * 100)
+          : 0;
+        const hintLine = showHint
+          ? `You used a hint today — no shame in that!`
+          : `You didn't use any hints today, which is amazing!`;
+
+        setHistory(prev => [...prev,
+          { text: `operator@linuxly:~$ ${cmd}`, type: 'cmd' },
+          { text: `[SUCCESS] ${res.message}`, type: 'resp' },
+          { text: ``, type: 'resp' },
+          { text: `Your answer was: ${cmd}`, type: 'resp' },
+          { text: `You solved it faster than ${100 - fasterThanPct}% of today's operators!`, type: 'resp' },
+          { text: `You used ${currentAttempt} attempt${currentAttempt !== 1 ? 's' : ''} today. ${hintLine}`, type: 'resp' },
+          { text: `Please visit me again tomorrow, won't you?`, type: 'resp' },
+        ]);
+        return latest; // no actual state mutation, just reading latest value
+      });
+
+      setIsSolved(true);
+
+      // Scroll page so terminal sits at top, intel box naturally follows below
+      setTimeout(() => {
+        solveMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+
     } else {
       setAttempts(currentAttempt);
       localStorage.setItem("linuxly_attempts", currentAttempt.toString());
@@ -241,11 +272,11 @@ export default function Home() {
         await fetchStats();
         fetchWeeklyRecap(userId);
       }
-      // Re-focus input so cursor stays in terminal after wrong answer
-      setTimeout(() => inputRef.current?.focus(), 0);
     }
 
     setIsChecking(false);
+    // Restore focus to terminal input after every outcome — harmless if input is disabled
+    setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   if (!mounted) return <div className="min-h-screen bg-slate-950" />;
@@ -526,8 +557,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* TERMINAL */}
-        <div className="bg-[#0b0e14] rounded-3xl border border-slate-800 flex flex-col flex-1 min-h-[450px] shadow-2xl relative overflow-hidden group">
+        {/* TERMINAL — ref used as scroll target on correct answer */}
+        <div ref={solveMessageRef} className="bg-[#0b0e14] rounded-3xl border border-slate-800 flex flex-col flex-1 min-h-[450px] shadow-2xl relative overflow-hidden group">
           <div className="px-6 py-3 border-b border-slate-800 flex justify-between items-center text-[10px] font-mono text-slate-600 uppercase tracking-widest">Console v2.4.1</div>
           <div ref={terminalBodyRef} className="p-6 overflow-y-auto font-mono text-sm space-y-2 flex-1 custom-scrollbar">
             {history.map((line, i) => (
