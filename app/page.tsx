@@ -121,15 +121,18 @@ export default function Home() {
       if (stats) setDailyStats(stats);
 
       if (session.solved && session.answer) {
-        // Calculate percentile: how the user ranks among solvers
         const solverCount = stats?.solved ?? 0;
         const userAttempt = session.attempts;
-        // Count solvers who used more attempts (user is better than them)
-        const betterThan = stats?.attemptsDist
-          .slice(userAttempt) // attempts > user's attempt
-          .reduce((a, b) => a + b, 0) ?? 0;
-        const percentile = solverCount > 0
-          ? Math.round((betterThan / solverCount) * 100)
+
+        // Count solvers who used strictly fewer attempts — they are faster than the user
+        // attemptsDist is [try1count, try2count, ...] so slice(0, userAttempt-1) = attempts < user's
+        const fasterThan = (stats?.attemptsDist ?? [])
+          .slice(0, userAttempt - 1)
+          .reduce((a: number, b: number) => a + b, 0);
+
+        // "You solved faster than X%" — how many of all solvers the user beat
+        const fasterThanPct = solverCount > 0
+          ? Math.round((fasterThan / solverCount) * 100)
           : 0;
 
         const hintLine = session.usedHint
@@ -141,8 +144,8 @@ export default function Home() {
           { text: `[SUCCESS] Success: Hash verified.`, type: 'resp' },
           { text: ``, type: 'resp' },
           { text: `Your answer was: ${session.answer}`, type: 'resp' },
-          { text: `Congratulations! You're in the top ${100 - percentile}% among those that answered correctly!`, type: 'resp' },
-          { text: `You used ${session.attempts} attempt${session.attempts !== 1 ? 's' : ''} today. ${hintLine}`, type: 'resp' },
+          { text: `You solved it faster than ${100 - fasterThanPct}% of today's operators!`, type: 'resp' },
+          { text: `You used ${userAttempt} attempt${userAttempt !== 1 ? 's' : ''} today. ${hintLine}`, type: 'resp' },
           { text: `Please visit me again tomorrow, won't you?`, type: 'resp' },
         ]);
       } else {

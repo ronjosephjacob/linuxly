@@ -56,41 +56,28 @@ export interface WeekDay {
   userResult: boolean | null;
 }
 
-// ── exported actions ──────────────────────────────────────────────────────────
+// ── server-side memory cache for past day stats (#18) ────────────────────────
+// Lives in Vercel function RAM — free to read, persists while instance is warm.
+// Only past days are cached (they never change). Today is always fetched fresh.
 
-/**
- * Returns the last 7 days (up to and including today) as WeekDay objects.
- * Days that haven't happened yet are excluded.
- * Duplicate challenges (same id) are de-duplicated so each question appears at most once.
- */
-export async function getWeeklyRecapAction(
-  userId: string,
-  cachedResults: Record<string, boolean | null> = {}
-): Promise<WeekDay[]> {
-  const nowManila = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-  const dayOfWeek = nowManila.getDay(); // 0=Sun, 1=Mon, ...
-  const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1); // Monday = start
+interface DayStats {
+  totalUsers: number;
+  solved: number;
+  failed: number;
+  solvedWithHint: number;
+  solvedWithoutHint: number;
+  attemptsDist: number[];
+}
 
-  const days: WeekDay[] = [];
-  const seenIds = new Set<number>();
+const pastDaysCache: Record<string, DayStats> = {};
+let pastDaysCacheDate = ""; // tracks which "today" the cache was built for
 
-  for (let offset = mondayOffset; offset <= 0; offset++) {
-    const dateStr = manilaDateOffset(offset);
-    const challenge = getChallengeForDate(dateStr);
+// ── helpers ───────────────────────────────────────────────────────────────────
 
-    // Skip duplicates
-    if (seenIds.has(challenge.id)) continue;
-    seenIds.add(challenge.id);
-
-    // Format label e.g. "March 16"
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const label = new Date(year, month - 1, day).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-    });
-
-    // Pull stats from Redis
-    const [totalUsers, solved, failed, solvedWithHint, solvedWithoutHint, ...attemptCounts] = await Promise.all([
+/** Fetch all 10 stats for a single date in one parallel batch (#15) */
+async function fetchDayStats(dateStr: string): Promise<DayStats> {
+  const [totalUsers, solved, failed, solvedWithHint, solvedWithoutHint, ...attemptCounts] =
+    await Promise.all([
       kv.scard(`daily_stats:${dateStr}:users`).catch(() => 0),
       kv.get(`daily_stats:${dateStr}:solved`).catch(() => 0),
       kv.get(`daily_stats:${dateStr}:failed`).catch(() => 0),
@@ -99,41 +86,101 @@ export async function getWeeklyRecapAction(
       ...([1,2,3,4,5].map(i => kv.get(`daily_stats:${dateStr}:attempts:${i}`).catch(() => 0))),
     ]);
 
-    const attemptsDist = attemptCounts.map(Number);
+  return {
+    totalUsers:        Number(totalUsers        ?? 0),
+    solved:            Number(solved            ?? 0),
+    failed:            Number(failed            ?? 0),
+    solvedWithHint:    Number(solvedWithHint    ?? 0),
+    solvedWithoutHint: Number(solvedWithoutHint ?? 0),
+    attemptsDist:      attemptCounts.map(v => Number(v ?? 0)),
+  };
+}
 
-    // Did this user participate?
-    let userResult: boolean | null = null;
-      if (dateStr in cachedResults) {
-        userResult = cachedResults[dateStr];
-      } else {
-        // fall back to Redis check
-        const solveVal = await kv.get(`solved:${dateStr}:${userId}`).catch(() => null);
-        if (solveVal !== null) {
-          userResult = true;
-        } else {
-          const failVal = await kv.get(`failed:${dateStr}:${userId}`).catch(() => null);
-          if (failVal !== null) userResult = false;
-        }
-      }
+// ── exported actions ──────────────────────────────────────────────────────────
 
-    days.push({
-      dateStr,
-      label,
-      challengeId: challenge.id,
-      questionName: challenge.question,
-      difficulty: challenge.difficulty,
-      stats: {
-        totalUsers: Number(totalUsers),
-        solved: Number(solved),
-        failed: Number(failed),
-        solvedWithHint: Number(solvedWithHint),
-        solvedWithoutHint: Number(solvedWithoutHint),
-        attemptsDist,
-      },
-      userResult,
-    });
+/**
+ * Returns Mon–today as WeekDay objects.
+ * - Past days served from server memory after first fetch (#18)
+ * - All Redis reads for all days fired in one parallel batch (#15)
+ * - User result checks for both solved+failed run in parallel (#16)
+ */
+export async function getWeeklyRecapAction(
+  userId: string,
+  cachedResults: Record<string, boolean | null> = {}
+): Promise<WeekDay[]> {
+  const todayStr = getManilaDateString();
+
+  // Reset cache when the day rolls over
+  if (pastDaysCacheDate !== todayStr) {
+    Object.keys(pastDaysCache).forEach(k => delete pastDaysCache[k]);
+    pastDaysCacheDate = todayStr;
   }
 
-  // Chronological order (oldest first)
-  return days;
+  // Build Mon→today date list, deduped by challenge id
+  const dayOfWeek = new Date(Date.now() + 8 * 60 * 60 * 1000).getUTCDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1);
+
+  const datesToShow: string[] = [];
+  const seenIds = new Set<number>();
+
+  for (let offset = mondayOffset; offset <= 0; offset++) {
+    const dateStr = manilaDateOffset(offset);
+    const challenge = getChallengeForDate(dateStr);
+    if (seenIds.has(challenge.id)) continue;
+    seenIds.add(challenge.id);
+    datesToShow.push(dateStr);
+  }
+
+  // Separate past days (cacheable) from today (always fresh)
+  const pastDates = datesToShow.filter(d => d !== todayStr);
+  const uncachedPastDates = pastDates.filter(d => !(d in pastDaysCache));
+
+  // #15: Fire all uncached past days + today + user checks in one parallel batch
+  let todayStats: DayStats = {
+    totalUsers: 0, solved: 0, failed: 0,
+    solvedWithHint: 0, solvedWithoutHint: 0, attemptsDist: [0,0,0,0,0],
+  };
+  const userResultMap: Record<string, boolean | null> = { ...cachedResults };
+  const unknownDates = datesToShow.filter(d => !(d in cachedResults));
+
+  await Promise.all([
+    // Fetch uncached past days → store in server memory
+    ...uncachedPastDates.map(d =>
+      fetchDayStats(d).then(s => { pastDaysCache[d] = s; })
+    ),
+    // Always fetch today fresh
+    fetchDayStats(todayStr).then(s => { todayStats = s; }),
+    // User result checks — solved + failed fetched in parallel per day (#16)
+    ...unknownDates.map(d =>
+      Promise.all([
+        kv.get(`solved:${d}:${userId}`).catch(() => null),
+        kv.get(`failed:${d}:${userId}`).catch(() => null),
+      ]).then(([solveVal, failVal]) => {
+        userResultMap[d] = solveVal !== null ? true
+                         : failVal !== null  ? false
+                         : null;
+      })
+    ),
+  ]);
+
+  // Assemble final result in chronological order
+  return datesToShow.map(dateStr => {
+    const challenge = getChallengeForDate(dateStr);
+    const stats = dateStr === todayStr ? todayStats : pastDaysCache[dateStr];
+
+    // Label formatted with explicit UTC date parts to avoid server timezone (#19)
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const label = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' })
+      .format(new Date(Date.UTC(year, month - 1, day)));
+
+    return {
+      dateStr,
+      label,
+      challengeId:  challenge.id,
+      questionName: challenge.question,
+      difficulty:   challenge.difficulty,
+      stats,
+      userResult:   userResultMap[dateStr] ?? null,
+    };
+  });
 }
