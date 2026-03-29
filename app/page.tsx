@@ -4,7 +4,7 @@ import {
   verifyAndSubmit,
   getDailyStatsAction,
   getDailyChallengeAction,
-  checkSolveStatus,
+  getUserSessionAction,
   LinuxQuestion
 } from "./actions";
 import { getWeeklyRecapAction, WeekDay } from "./weekly-actions";
@@ -67,7 +67,6 @@ export default function Home() {
   const [weeklyRecapLoading, setWeeklyRecapLoading] = useState(true);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
-  const terminalEndRef = useRef<HTMLDivElement>(null);
   const MAX_ATTEMPTS = 5;
 
   const getBaseCommand = (answers: string[] | undefined) => {
@@ -112,11 +111,43 @@ export default function Home() {
     if (!id) return;
     setLoading(true);
     try {
-      const daily = await getDailyChallengeAction();
-      const solved = await checkSolveStatus(id);
+      const [daily, session, stats] = await Promise.all([
+        getDailyChallengeAction(),
+        getUserSessionAction(id),
+        getDailyStatsAction(),
+      ]);
       setChallenge(daily);
-      setIsSolved(solved);
-      setHistory([{ text: solved ? "System: Session complete. Records archived." : "SSH Session Initialized. Awaiting command...", type: 'resp' }]);
+      setIsSolved(session.solved);
+      if (stats) setDailyStats(stats);
+
+      if (session.solved && session.answer) {
+        // Calculate percentile: how the user ranks among solvers
+        const solverCount = stats?.solved ?? 0;
+        const userAttempt = session.attempts;
+        // Count solvers who used more attempts (user is better than them)
+        const betterThan = stats?.attemptsDist
+          .slice(userAttempt) // attempts > user's attempt
+          .reduce((a, b) => a + b, 0) ?? 0;
+        const percentile = solverCount > 0
+          ? Math.round((betterThan / solverCount) * 100)
+          : 0;
+
+        const hintLine = session.usedHint
+          ? `You used a hint today — no shame in that!`
+          : `You didn't use any hints today, which is amazing!`;
+
+        setHistory([
+          { text: `operator@linuxly:~$ ${session.answer}`, type: 'cmd' },
+          { text: `[SUCCESS] Success: Hash verified.`, type: 'resp' },
+          { text: ``, type: 'resp' },
+          { text: `Your answer was: ${session.answer}`, type: 'resp' },
+          { text: `Congratulations! You're in the top ${100 - percentile}% among those that answered correctly!`, type: 'resp' },
+          { text: `You used ${session.attempts} attempt${session.attempts !== 1 ? 's' : ''} today. ${hintLine}`, type: 'resp' },
+          { text: `Please visit me again tomorrow, won't you?`, type: 'resp' },
+        ]);
+      } else {
+        setHistory([{ text: "SSH Session Initialized. Awaiting command...", type: 'resp' }]);
+      }
     } catch {
       setHistory([{ text: "Error: Uplink failure.", type: 'resp' }]);
     } finally {
@@ -133,13 +164,12 @@ export default function Home() {
     setWeeklyRecapLoading(false);
   }, []);
 
-  // Phase 1: Load challenge + daily stats immediately on mount
+  // Phase 1: Load challenge + daily stats immediately on mount (fetchStats merged into syncChallenge)
   useEffect(() => {
     if (mounted && userId) {
       syncChallenge(userId);
-      fetchStats();
     }
-  }, [mounted, userId, syncChallenge, fetchStats]);
+  }, [mounted, userId, syncChallenge]);
 
   // Phase 2: Load weekly recap only AFTER challenge finishes loading
   useEffect(() => {
@@ -163,9 +193,15 @@ export default function Home() {
     return () => clearInterval(timer);
   }, []);
 
+  // Scroll only the terminal's own container, not the page
+  const terminalBodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (terminalBodyRef.current) {
+      terminalBodyRef.current.scrollTop = terminalBodyRef.current.scrollHeight;
+    }
   }, [history]);
+
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // --- HANDLERS ---
   const handleCommand = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -187,7 +223,8 @@ export default function Home() {
         { text: `operator@linuxly:~$ ${cmd}`, type: 'cmd' },
         { text: `[SUCCESS] ${res.message}`, type: 'resp' }
       ]);
-      fetchStats();
+      await fetchStats();
+      fetchWeeklyRecap(userId);
     } else {
       setAttempts(currentAttempt);
       localStorage.setItem("linuxly_attempts", currentAttempt.toString());
@@ -198,8 +235,11 @@ export default function Home() {
       if (currentAttempt >= MAX_ATTEMPTS) {
         const todayStr = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
         setCachedDayResult(todayStr, false);
-        fetchStats();
+        await fetchStats();
+        fetchWeeklyRecap(userId);
       }
+      // Re-focus input so cursor stays in terminal after wrong answer
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
 
     setIsChecking(false);
@@ -486,13 +526,14 @@ export default function Home() {
         {/* TERMINAL */}
         <div className="bg-[#0b0e14] rounded-3xl border border-slate-800 flex flex-col flex-1 min-h-[450px] shadow-2xl relative overflow-hidden group">
           <div className="px-6 py-3 border-b border-slate-800 flex justify-between items-center text-[10px] font-mono text-slate-600 uppercase tracking-widest">Console v2.4.1</div>
-          <div className="p-6 overflow-y-auto font-mono text-sm space-y-2 flex-1 custom-scrollbar">
+          <div ref={terminalBodyRef} className="p-6 overflow-y-auto font-mono text-sm space-y-2 flex-1 custom-scrollbar">
             {history.map((line, i) => (
               <div key={i} className={`leading-relaxed break-words ${line.type === 'resp' ? 'text-emerald-400' : 'text-slate-400'}`}>{line.text}</div>
             ))}
             <div className="flex gap-3">
               <span className="text-emerald-500 font-bold shrink-0">operator@linuxly:~$</span>
               <input
+                ref={inputRef}
                 disabled={isGameOver || isChecking || loading}
                 value={isGameOver ? "" : input}
                 onChange={(e) => setInput(e.target.value)}
@@ -504,7 +545,7 @@ export default function Home() {
                 autoComplete="off"
               />
             </div>
-            <div ref={terminalEndRef} />
+
           </div>
           <div className="px-6 py-3 bg-slate-900/30 border-t border-slate-800/50 flex justify-between items-center text-[9px] font-mono text-slate-600">
             <div>Attempts: {attempts}/{MAX_ATTEMPTS}</div>

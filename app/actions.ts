@@ -45,13 +45,6 @@ export async function getDailyChallengeAction() {
   return challengesData[dailyIndex] as LinuxQuestion;
 }
 
-export async function checkSolveStatus(userId: string) {
-  const todayStr = getManilaDateString();
-  const solveKey = `solved:${todayStr}:${userId}`;
-  const alreadySolved = await kv.get(solveKey);
-  return !!alreadySolved; 
-}
-
 // Fetch Daily Global Stats
 export async function getDailyStatsAction() {
   const todayStr = getManilaDateString();
@@ -106,8 +99,13 @@ export async function verifyAndSubmit(
   const isCorrect = challenge.answers.some((ans) => clean(ans) === clean(userInput));
 
   if (isCorrect) {
-    // Save solve status
-    await kv.set(solveKey, true, { ex: 86400 });
+    // Save solve status + per-user session data for reload recovery
+    await Promise.all([
+      kv.set(solveKey, true, { ex: 172800 }),
+      kv.set(`answer:${todayStr}:${userId}`, userInput, { ex: 172800 }),
+      kv.set(`attempts:${todayStr}:${userId}`, attemptNumber, { ex: 172800 }),
+      kv.set(`hint:${todayStr}:${userId}`, usedHint ? 1 : 0, { ex: 172800 }),
+    ]);
 
     // Track Success Stats
     const solvedKey = `daily_stats:${todayStr}:solved`;
@@ -121,7 +119,6 @@ export async function verifyAndSubmit(
     await kv.incr(hintStatKey);
     await kv.expire(hintStatKey, 172800);
 
-    // Removed XP synchronized message
     return { success: true, message: "Success: Hash verified." };
   }
 
@@ -136,4 +133,23 @@ export async function verifyAndSubmit(
   }
 
   return { success: false, message: "Error: Invalid command sequence." };
+}
+
+// Fetch stored session data for a user on page reload (to rebuild terminal history)
+export async function getUserSessionAction(userId: string) {
+  const todayStr = getManilaDateString();
+
+  const [solveVal, answerVal, attemptsVal, hintVal] = await Promise.all([
+    kv.get(`solved:${todayStr}:${userId}`),
+    kv.get(`answer:${todayStr}:${userId}`),
+    kv.get(`attempts:${todayStr}:${userId}`),
+    kv.get(`hint:${todayStr}:${userId}`),
+  ]);
+
+  return {
+    solved: !!solveVal,
+    answer: answerVal as string | null,
+    attempts: Number(attemptsVal ?? 0),
+    usedHint: !!hintVal,
+  };
 }
