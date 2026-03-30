@@ -45,30 +45,27 @@ export async function getDailyChallengeAction() {
   return challengesData[dailyIndex] as LinuxQuestion;
 }
 
-// Fetch Daily Global Stats
+// Fetch Daily Global Stats — all 8 reads fired in parallel (#9)
 export async function getDailyStatsAction() {
   const todayStr = getManilaDateString();
-  const totalUsers = await kv.scard(`daily_stats:${todayStr}:users`) || 0;
-  const solved = await kv.get(`daily_stats:${todayStr}:solved`) as number || 0;
-  const failed = await kv.get(`daily_stats:${todayStr}:failed`) as number || 0;
-  
-  // New: Fetch Hint Usage Stats
-  const solvedWithHint = await kv.get(`daily_stats:${todayStr}:solved_with_hint`) as number || 0;
-  const solvedWithoutHint = await kv.get(`daily_stats:${todayStr}:solved_without_hint`) as number || 0;
 
-  const attemptsDist = [];
-  for(let i = 1; i <= 5; i++) {
-    const count = await kv.get(`daily_stats:${todayStr}:attempts:${i}`) as number || 0;
-    attemptsDist.push(Number(count));
-  }
+  const [totalUsers, solved, failed, solvedWithHint, solvedWithoutHint, ...attemptCounts] =
+    await Promise.all([
+      kv.scard(`daily_stats:${todayStr}:users`),
+      kv.get(`daily_stats:${todayStr}:solved`),
+      kv.get(`daily_stats:${todayStr}:failed`),
+      kv.get(`daily_stats:${todayStr}:solved_with_hint`),
+      kv.get(`daily_stats:${todayStr}:solved_without_hint`),
+      ...([1,2,3,4,5].map(i => kv.get(`daily_stats:${todayStr}:attempts:${i}`))),
+    ]);
 
-  return { 
-    totalUsers, 
-    solved: Number(solved), 
-    failed: Number(failed), 
-    attemptsDist,
-    solvedWithHint: Number(solvedWithHint),
-    solvedWithoutHint: Number(solvedWithoutHint)
+  return {
+    totalUsers:        Number(totalUsers        ?? 0),
+    solved:            Number(solved            ?? 0),
+    failed:            Number(failed            ?? 0),
+    solvedWithHint:    Number(solvedWithHint    ?? 0),
+    solvedWithoutHint: Number(solvedWithoutHint ?? 0),
+    attemptsDist:      attemptCounts.map(v => Number(v ?? 0)),
   };
 }
 
@@ -87,10 +84,12 @@ export async function verifyAndSubmit(
     return { success: false, message: "⚠️ Already submitted today." };
   }
 
-  // 1. Track unique user participation for the day
-  const usersKey = `daily_stats:${todayStr}:users`;
-  await kv.sadd(usersKey, userId);
-  await kv.expire(usersKey, 172800); 
+  // 1. Track unique user participation — only needed on first attempt (#10)
+  if (attemptNumber === 1) {
+    const usersKey = `daily_stats:${todayStr}:users`;
+    await kv.sadd(usersKey, userId);
+    await kv.expire(usersKey, 172800);
+  }
 
   const challenge = (challengesData as RawChallenge[]).find(c => c.id === challengeId);
   if (!challenge) return { success: false, message: "Critical: Data missing." };

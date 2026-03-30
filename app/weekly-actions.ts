@@ -44,6 +44,7 @@ export interface WeekDay {
   challengeId: number;
   questionName: string;     // challenge.question
   difficulty: string;
+  answers: string[];        // correct answers for the modal
   stats: {
     totalUsers: number;
     solved: number;
@@ -179,6 +180,7 @@ export async function getWeeklyRecapAction(
       challengeId:  challenge.id,
       questionName: challenge.question,
       difficulty:   challenge.difficulty,
+      answers:      challenge.answers,
       stats,
       userResult:   userResultMap[dateStr] ?? null,
     };

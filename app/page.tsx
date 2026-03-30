@@ -66,6 +66,7 @@ export default function Home() {
   const [weeklyRecap, setWeeklyRecap] = useState<WeekDay[]>([]);
   const [weeklyRecapLoading, setWeeklyRecapLoading] = useState(true);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const [recapModal, setRecapModal] = useState<WeekDay | null>(null);
 
   const MAX_ATTEMPTS = 5;
 
@@ -275,17 +276,8 @@ export default function Home() {
     }
 
     setIsChecking(false);
-    // Re-focus the input after a wrong answer once React has re-rendered and re-enabled it.
-    // Double rAF ensures we fire AFTER the browser paints the re-enabled input —
-    // a plain setTimeout(0) fires before React flushes the isChecking=false re-render.
-    // Only focus if the game isn't over (correct answer disables input permanently).
-    if (!res.success && currentAttempt < MAX_ATTEMPTS) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          inputRef.current?.focus();
-        });
-      });
-    }
+    // Restore focus to terminal input after every outcome — harmless if input is disabled
+    setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   if (!mounted) return <div className="min-h-screen bg-slate-950" />;
@@ -326,6 +318,98 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* WEEKLY RECAP QUESTION MODAL */}
+      {recapModal && (() => {
+        const s = recapModal.stats;
+        const successPct = s.totalUsers > 0 ? Math.round((s.solved  / s.totalUsers) * 100) : 0;
+        const wrongPct   = s.totalUsers > 0 ? Math.round((s.failed  / s.totalUsers) * 100) : 0;
+        const didAnswer  = recapModal.userResult !== null;
+        const didSolve   = recapModal.userResult === true;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setRecapModal(null)} />
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl relative z-10 w-full max-w-lg animate-in zoom-in-95 duration-200 overflow-hidden">
+
+              {/* Header */}
+              <div className="px-7 pt-7 pb-5 border-b border-slate-800">
+                <div className="flex items-start justify-between gap-4 mb-3">
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${
+                    recapModal.difficulty === 'easy'   ? 'text-emerald-400 border-emerald-500/30' :
+                    recapModal.difficulty === 'medium' ? 'text-amber-400   border-amber-500/30'   :
+                    recapModal.difficulty === 'hard'   ? 'text-rose-400    border-rose-500/30'     :
+                                                         'text-purple-400  border-purple-500/30'
+                  }`}>{recapModal.difficulty}</span>
+                  <button onClick={() => setRecapModal(null)} className="text-slate-600 hover:text-slate-400 transition-colors shrink-0">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-mono text-slate-500">{recapModal.label}</span>
+                  {didAnswer && (
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${didSolve ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                      {didSolve ? '✓ Solved' : '✗ Failed'}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-lg font-semibold text-slate-100 leading-snug">{recapModal.questionName}</h2>
+              </div>
+
+              {/* Body */}
+              <div className="px-7 py-5 space-y-5 max-h-[60vh] overflow-y-auto custom-scrollbar">
+
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-slate-800/50 rounded-2xl p-3 border border-slate-700/50">
+                    <div className="text-lg font-mono text-slate-200">{s.totalUsers}</div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Operators</div>
+                  </div>
+                  <div className="bg-emerald-500/10 rounded-2xl p-3 border border-emerald-500/20">
+                    <div className="text-lg font-mono text-emerald-400">{successPct}%</div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Solved</div>
+                  </div>
+                  <div className="bg-rose-500/10 rounded-2xl p-3 border border-rose-500/20">
+                    <div className="text-lg font-mono text-rose-400">{wrongPct}%</div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Failed</div>
+                  </div>
+                </div>
+
+                {/* Attempts distribution */}
+                <div>
+                  <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">Solves by Attempt</h4>
+                  <div className="space-y-1.5">
+                    {s.attemptsDist.slice(0, 5).map((count, idx) => {
+                      const pct = s.solved > 0 ? Math.round((count / s.solved) * 100) : 0;
+                      return (
+                        <div key={idx} className="flex items-center gap-2 text-[10px] font-mono">
+                          <span className="text-slate-500 w-10 text-right shrink-0">Try {idx + 1}</span>
+                          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500/50 transition-all duration-700" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-slate-600 w-6 shrink-0">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Correct answer — always shown */}
+                <div>
+                  <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">Correct Answer</h4>
+                  <div className="space-y-1.5">
+                    {recapModal.answers.map((ans, i) => (
+                      <div key={i} className="bg-[#0b0e14] px-4 py-2.5 rounded-xl border border-slate-800 font-mono text-sm text-emerald-400">
+                        <span className="text-slate-600 mr-2 select-none">&gt;</span>{ans}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* SIDEBAR */}
       <div className="lg:col-span-4 flex flex-col gap-6">
@@ -443,7 +527,13 @@ export default function Home() {
                     >
                       <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
                       <span className="text-[11px] font-mono text-slate-400 w-20 shrink-0">{day.label}</span>
-                      <span className="text-[11px] text-slate-300 flex-1 truncate font-medium">{day.questionName}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setRecapModal(day); }}
+                        className="text-[11px] text-emerald-400 hover:text-emerald-300 flex-1 text-left font-medium hover:underline underline-offset-2 transition-colors line-clamp-1 min-w-0"
+                        title={day.questionName}
+                      >
+                        {day.questionName}
+                      </button>
                       <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border shrink-0 ${
                         day.difficulty === 'easy'   ? 'text-emerald-400 border-emerald-500/30' :
                         day.difficulty === 'medium' ? 'text-amber-400   border-amber-500/30'   :
