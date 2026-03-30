@@ -275,8 +275,17 @@ export default function Home() {
     }
 
     setIsChecking(false);
-    // Restore focus to terminal input after every outcome — harmless if input is disabled
-    setTimeout(() => inputRef.current?.focus(), 0);
+    // Re-focus the input after a wrong answer once React has re-rendered and re-enabled it.
+    // Double rAF ensures we fire AFTER the browser paints the re-enabled input —
+    // a plain setTimeout(0) fires before React flushes the isChecking=false re-render.
+    // Only focus if the game isn't over (correct answer disables input permanently).
+    if (!res.success && currentAttempt < MAX_ATTEMPTS) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          inputRef.current?.focus();
+        });
+      });
+    }
   };
 
   if (!mounted) return <div className="min-h-screen bg-slate-950" />;
